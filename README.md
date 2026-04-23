@@ -2,7 +2,7 @@
 
 FFI bindings to the [Noesis GUI Native SDK](https://www.noesisengine.com/) plus a narrow C++ shim that exposes a `Noesis::RenderDevice` C++ subclass back to Rust. Renderer-agnostic — Bevy integration lives in the sibling crate [`dm_noesis_bevy`](https://github.com/dead-money/dm_noesis_bevy).
 
-**Status:** Phases 0 + 1 complete. Lifecycle (`init` / `shutdown` / `version`) plus the full `RenderDevice` C++ subclass + Rust vtable + integration test. See [`docs/PHASE_1_PLAN.md`](./docs/PHASE_1_PLAN.md) for the design context. Phase plan for the Bevy plugin lives in [`../dm_noesis_bevy/CLAUDE.md`](https://github.com/dead-money/dm_noesis_bevy/blob/main/CLAUDE.md).
+**Status:** Phases 0, 1, and 4.C's FFI surface complete. Lifecycle (`init` / `shutdown` / `version`), the full `RenderDevice` C++ subclass + Rust vtable, plus the Phase 4.C `XamlProvider` / `IView` / `IRenderer` wrappers that let Noesis drive the render device through a loaded XAML tree. See [`docs/PHASE_1_PLAN.md`](./docs/PHASE_1_PLAN.md) for the render-device design context. The full phase plan lives in [`../dm_noesis_bevy/CLAUDE.md`](https://github.com/dead-money/dm_noesis_bevy/blob/main/CLAUDE.md).
 
 ## FFI surface roadmap
 
@@ -10,7 +10,7 @@ What this crate exposes, layered by phase. Each layer ships only when its siblin
 
 - [x] **0 — Lifecycle.** `dm_noesis::{init, shutdown, set_license, version}`. C++ shim is `cpp/noesis_shim.{h,cpp}`. Verified by `tests/lifecycle.rs`.
 - [x] **1 — Render device.** `RenderDevice` trait (`src/render_device/device.rs`) + C++ `RustRenderDevice` / `RustTexture` / `RustRenderTarget` subclasses that trampoline every Noesis pure virtual into Rust. `register()` returns a `Registered` guard that owns the boxed impl + the C++ device handle. Verified by `tests/render_device.rs --features test-utils`.
-- [ ] **4 — View + XAML.** `View` lifecycle, XAML loader / `XamlProvider`, input pump (`MouseMove`, `MouseButtonDown`, `KeyDown`, etc.). The Bevy plugin drives `View::Update` and `Renderer::Render` from this surface.
+- [x] **4.C — View + XamlProvider.** `XamlProvider` trait + `set_xaml_provider` (`src/xaml_provider.rs`) mirror the render-device registration pattern — `RustXamlProvider` C++ subclass trampolines `LoadXaml(Uri)` into the Rust vtable and wraps the returned bytes in a zero-copy `MemoryStream`. `FrameworkElement`, `View`, and `Renderer` safe wrappers over the opaque handles live in `src/view.rs`. Input pump (`MouseMove`, `KeyDown`, etc.) lands later when needed by the Bevy plugin's input sub-phase.
 - [ ] **5 — Resource provider.** `FileTextureProvider`, `FontProvider`, custom resource lookup via Bevy's `AssetServer`.
 - [ ] **6 — Effects** — custom pixel-shader registration through `Batch.pixelShader`.
 
@@ -38,9 +38,13 @@ export NOESIS_LICENSE_KEY=...
 ## Layout
 
 - `cpp/noesis_shim.{h,cpp}` — narrow C ABI over Noesis. Hand-written.
+- `cpp/noesis_render_device.cpp` — `RustRenderDevice` / `RustTexture` / `RustRenderTarget` C++ subclasses trampolining into the Rust vtable (Phase 1).
+- `cpp/noesis_view.cpp` — `RustXamlProvider` subclass + thin `IView` / `IRenderer` forwarders (Phase 4.C).
 - `src/ffi.rs` — Rust declarations mirroring the shim header.
-- `src/lib.rs` — safe-ish wrappers.
-- `build.rs` — resolves `NOESIS_SDK_DIR`, compiles the shim with `cc`, links `libNoesis`, bakes `Bin/<platform>/` into `rpath` on Linux.
+- `src/lib.rs` — top-level safe wrappers (lifecycle).
+- `src/render_device/` — `RenderDevice` trait + `register()` / `Registered` guard (Phase 1).
+- `src/xaml_provider.rs`, `src/view.rs` — `XamlProvider` trait + `View` / `Renderer` wrappers (Phase 4.C).
+- `build.rs` — resolves `NOESIS_SDK_DIR`, compiles the shim TUs with `cc`, links `libNoesis`, bakes `Bin/<platform>/` into `rpath` on Linux.
 
 ## Why not bindgen?
 
