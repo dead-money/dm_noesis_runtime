@@ -7,13 +7,18 @@
 //!   compile time.
 //! - [`device`] — the [`RenderDevice`] trait that Rust-side device impls
 //!   satisfy, plus its handle / desc / binding plain-data types.
-//! - `vtable` (Phase 1.5) — extern "C" trampolines that dispatch from the
-//!   C++ `RustRenderDevice` subclass into a boxed [`RenderDevice`] impl.
+//! - [`ffi`] — Rust mirrors of the C ABI types in `cpp/noesis_shim.h`,
+//!   plus `extern "C"` decls for the factory and helpers.
+//! - [`vtable`] — `extern "C"` trampolines + the [`register`] entry point
+//!   that owns the boxed impl and the C++ `RustRenderDevice` handle.
 
 pub mod device;
+pub mod ffi;
 pub mod types;
+pub mod vtable;
 
 pub use device::{
     RenderDevice, RenderTargetBinding, RenderTargetDesc, RenderTargetHandle, TextureBinding,
     TextureDesc, TextureHandle, TextureRect,
 };
+pub use vtable::{register, Registered};

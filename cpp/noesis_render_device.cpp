@@ -35,11 +35,13 @@ class RustTexture final : public Noesis::Texture {
 public:
     RustTexture(RustRenderDevice* device, uint64_t handle,
                 uint32_t width, uint32_t height,
+                Noesis::TextureFormat::Enum format,
                 bool has_mipmaps, bool inverted, bool has_alpha)
         : mDevice(device)
         , mHandle(handle)
         , mWidth(width)
         , mHeight(height)
+        , mFormat(format)
         , mHasMipMaps(has_mipmaps)
         , mInverted(inverted)
         , mHasAlpha(has_alpha)
@@ -54,12 +56,14 @@ public:
     bool HasAlpha() const override { return mHasAlpha; }
 
     uint64_t handle() const { return mHandle; }
+    Noesis::TextureFormat::Enum format() const { return mFormat; }
 
 private:
     RustRenderDevice* mDevice;
     uint64_t mHandle;
     uint32_t mWidth;
     uint32_t mHeight;
+    Noesis::TextureFormat::Enum mFormat;
     bool mHasMipMaps;
     bool mInverted;
     bool mHasAlpha;
@@ -140,15 +144,16 @@ public:
         dm_noesis_texture_binding b{};
         mVtable.create_texture(mUserdata, label, width, height, numLevels,
                                static_cast<uint32_t>(format), data, &b);
-        return makeTexture(b);
+        return makeTexture(b, format);
     }
 
     void UpdateTexture(Noesis::Texture* texture, uint32_t level,
                        uint32_t x, uint32_t y, uint32_t width, uint32_t height,
                        const void* data) override
     {
-        const uint64_t handle = static_cast<RustTexture*>(texture)->handle();
-        mVtable.update_texture(mUserdata, handle, level, x, y, width, height, data);
+        const auto* t = static_cast<RustTexture*>(texture);
+        mVtable.update_texture(mUserdata, t->handle(), level, x, y, width, height,
+                               static_cast<uint32_t>(t->format()), data);
     }
 
     void EndUpdatingTextures(Noesis::Texture** textures, uint32_t count) override {
@@ -197,16 +202,22 @@ public:
     }
 
 private:
-    Noesis::Ptr<RustTexture> makeTexture(const dm_noesis_texture_binding& b) {
+    Noesis::Ptr<RustTexture> makeTexture(const dm_noesis_texture_binding& b,
+                                         Noesis::TextureFormat::Enum format) {
         return Noesis::MakePtr<RustTexture>(this, b.handle, b.width, b.height,
-                                            b.has_mipmaps, b.inverted, b.has_alpha);
+                                            format, b.has_mipmaps, b.inverted, b.has_alpha);
     }
 
     Noesis::Ptr<Noesis::RenderTarget> makeRenderTarget(
         const dm_noesis_render_target_binding& b)
     {
+        // Resolve textures are always RGBA8 — that's what Noesis uses for the
+        // composited surface. (The Rust impl is free to pick a wgpu format
+        // internally as long as that mapping is consistent with how it reads
+        // back via UpdateTexture.)
         return Noesis::MakePtr<RustRenderTarget>(
-            this, b.handle, makeTexture(b.resolve_texture));
+            this, b.handle,
+            makeTexture(b.resolve_texture, Noesis::TextureFormat::RGBA8));
     }
 
     dm_noesis_render_device_vtable mVtable;
