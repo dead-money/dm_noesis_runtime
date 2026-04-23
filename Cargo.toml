@@ -1,0 +1,18 @@
+[package]
+name = "dm_noesis"
+version = "0.1.0"
+edition = "2024"
+description = "FFI to the Noesis GUI Native SDK plus a wgpu-friendly RenderDevice subclass shim. Renderer-agnostic; Bevy integration lives in dm_noesis_bevy."
+repository = "https://github.com/dead-money/dm_noesis"
+publish = false
+links = "Noesis"
+
+[dependencies]
+thiserror = "2"
+
+[build-dependencies]
+cc = "1"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
