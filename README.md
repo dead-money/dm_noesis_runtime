@@ -2,14 +2,14 @@
 
 FFI bindings to the [Noesis GUI Native SDK](https://www.noesisengine.com/) plus a narrow C++ shim that exposes a `Noesis::RenderDevice` C++ subclass back to Rust. Renderer-agnostic — Bevy integration lives in the sibling crate [`dm_noesis_bevy`](https://github.com/dead-money/dm_noesis_bevy).
 
-**Status:** Phase 0 complete (init / shutdown / version). Phase 1 (render-device subclass + Rust vtable) in planning — see [`docs/PHASE_1_PLAN.md`](./docs/PHASE_1_PLAN.md). The full phase plan lives in [`../dm_noesis_bevy/CLAUDE.md`](https://github.com/dead-money/dm_noesis_bevy/blob/main/CLAUDE.md).
+**Status:** Phases 0 + 1 complete. Lifecycle (`init` / `shutdown` / `version`) plus the full `RenderDevice` C++ subclass + Rust vtable + integration test. See [`docs/PHASE_1_PLAN.md`](./docs/PHASE_1_PLAN.md) for the design context. Phase plan for the Bevy plugin lives in [`../dm_noesis_bevy/CLAUDE.md`](https://github.com/dead-money/dm_noesis_bevy/blob/main/CLAUDE.md).
 
 ## FFI surface roadmap
 
 What this crate exposes, layered by phase. Each layer ships only when its sibling crate's milestone needs it.
 
 - [x] **0 — Lifecycle.** `dm_noesis::{init, shutdown, set_license, version}`. C++ shim is `cpp/noesis_shim.{h,cpp}`. Verified by `tests/lifecycle.rs`.
-- [ ] **1 — Render device.** `RenderDevice` trait + C++ `RustRenderDevice` subclass that trampolines every Noesis pure virtual into Rust. Plus `RustTexture` / `RustRenderTarget` subclasses for the resources Noesis allocates through us. *(Plan: [`docs/PHASE_1_PLAN.md`](./docs/PHASE_1_PLAN.md).)*
+- [x] **1 — Render device.** `RenderDevice` trait (`src/render_device/device.rs`) + C++ `RustRenderDevice` / `RustTexture` / `RustRenderTarget` subclasses that trampoline every Noesis pure virtual into Rust. `register()` returns a `Registered` guard that owns the boxed impl + the C++ device handle. Verified by `tests/render_device.rs --features test-utils`.
 - [ ] **4 — View + XAML.** `View` lifecycle, XAML loader / `XamlProvider`, input pump (`MouseMove`, `MouseButtonDown`, `KeyDown`, etc.). The Bevy plugin drives `View::Update` and `Renderer::Render` from this surface.
 - [ ] **5 — Resource provider.** `FileTextureProvider`, `FontProvider`, custom resource lookup via Bevy's `AssetServer`.
 - [ ] **6 — Effects** — custom pixel-shader registration through `Batch.pixelShader`.
