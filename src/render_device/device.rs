@@ -144,7 +144,18 @@ pub struct RenderTargetBinding {
 ///
 /// Noesis calls every method on a single thread (the render thread). `&mut`
 /// receivers reflect that; impls do not need internal locking.
-pub trait RenderDevice {
+pub trait RenderDevice: 'static {
+    /// Downcast escape hatch used by [`Registered::device_mut`] so callers
+    /// can reach back into their concrete impl after registration. Standard
+    /// one-line body for every impl:
+    ///
+    /// ```ignore
+    /// fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    /// ```
+    ///
+    /// [`Registered::device_mut`]: crate::render_device::Registered::device_mut
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+
     // ─── Capability query ─────────────────────────────────────────────────
 
     /// Static device capabilities. Called once early in setup; the impl can

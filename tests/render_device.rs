@@ -121,6 +121,10 @@ impl MockDevice {
 }
 
 impl RenderDevice for MockDevice {
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn caps(&self) -> DeviceCaps {
         self.push(Op::GetCaps);
         DeviceCaps::default()

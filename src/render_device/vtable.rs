@@ -341,6 +341,27 @@ impl Registered {
     pub fn raw(&self) -> *mut c_void {
         self.handle.as_ptr()
     }
+
+    /// Mutable access to the concrete [`RenderDevice`] impl behind the
+    /// registration. Use when a system needs to mutate driver state between
+    /// Noesis calls (e.g. swapping the onscreen target view each frame
+    /// before driving the renderer).
+    ///
+    /// The type parameter `D` must match the concrete type passed to
+    /// [`register`]; enforced at runtime via `dyn Any` downcast.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `D` is not the concrete type `register` was called with.
+    pub fn device_mut<D: RenderDevice>(&mut self) -> &mut D {
+        // SAFETY: userdata points at the live Box<dyn RenderDevice> produced
+        // by register(); the borrow lives only as long as &mut self.
+        let boxed: &mut Box<dyn RenderDevice> = unsafe { self.userdata.as_mut() };
+        (**boxed)
+            .as_any_mut()
+            .downcast_mut::<D>()
+            .expect("Registered::device_mut: type does not match the one given to register")
+    }
 }
 
 impl Drop for Registered {

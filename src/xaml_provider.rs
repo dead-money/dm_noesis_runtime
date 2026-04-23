@@ -31,7 +31,15 @@ use crate::ffi::{
 /// a `HashMap<String, Vec<u8>>`) and returning a borrow is sufficient.
 ///
 /// [`load_xaml`]: Self::load_xaml
-pub trait XamlProvider {
+pub trait XamlProvider: 'static {
+    /// Downcast escape hatch used by [`Registered::provider_mut`]. Standard
+    /// one-line body for every impl:
+    ///
+    /// ```ignore
+    /// fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    /// ```
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+
     /// Return the XAML bytes for `uri`, or `None` if the URI is unknown.
     fn load_xaml(&mut self, uri: &str) -> Option<&[u8]>;
 }
@@ -95,6 +103,23 @@ impl Registered {
     #[must_use]
     pub fn raw(&self) -> *mut c_void {
         self.handle.as_ptr()
+    }
+
+    /// Mutable access to the concrete [`XamlProvider`] impl behind the
+    /// registration. The type parameter `P` must match what was passed to
+    /// [`set_xaml_provider`]; enforced at runtime via `dyn Any` downcast.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `P` is not the concrete type passed to `set_xaml_provider`.
+    pub fn provider_mut<P: XamlProvider>(&mut self) -> &mut P {
+        // SAFETY: userdata points at the live Box<dyn XamlProvider> produced
+        // by set_xaml_provider(); borrow scoped to &mut self.
+        let boxed: &mut Box<dyn XamlProvider> = unsafe { self.userdata.as_mut() };
+        (**boxed)
+            .as_any_mut()
+            .downcast_mut::<P>()
+            .expect("Registered::provider_mut: type does not match set_xaml_provider")
     }
 }
 
