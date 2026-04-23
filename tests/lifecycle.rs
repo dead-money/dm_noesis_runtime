@@ -1,4 +1,4 @@
-//! Phase 0 smoke test: links libNoesis, runs Init / GetBuildVersion / Shutdown.
+//! Phase 0 smoke test: links libNoesis, runs Init / `GetBuildVersion` / Shutdown.
 //!
 //! Requires `NOESIS_SDK_DIR` to be set at build time and `libNoesis.so` to be
 //! resolvable at run time (the build script bakes an rpath on Linux, so this
