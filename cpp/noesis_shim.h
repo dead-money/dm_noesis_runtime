@@ -165,6 +165,81 @@ void dm_noesis_render_device_destroy(void* device);
 uint64_t dm_noesis_texture_get_handle(const void* texture);
 uint64_t dm_noesis_render_target_get_handle(const void* surface);
 
+// ── XAML provider (Phase 4.C) ──────────────────────────────────────────────
+//
+// The Rust side subclasses `Noesis::XamlProvider` via a vtable of fn pointers.
+// `dm_noesis_xaml_provider_create` returns a `Noesis::XamlProvider*` (refcount
+// = 1) wrapping that vtable; pair with `_destroy`. Install it globally with
+// `dm_noesis_set_xaml_provider`.
+//
+// `load_xaml` callback contract:
+//   - Return `true` with `*out_data` / `*out_len` set on success. The pointed
+//     bytes must stay valid until Noesis finishes parsing the XAML, which is
+//     synchronous with the `GUI::LoadXaml` call that triggered it. In practice
+//     the Rust impl owns the bytes (e.g. in a HashMap) and returns a slice
+//     into them.
+//   - Return `false` to signal not-found; Noesis will produce a load error.
+
+typedef struct dm_noesis_xaml_provider_vtable {
+    bool (*load_xaml)(
+        void* userdata,
+        const char* uri,
+        const uint8_t** out_data,
+        uint32_t* out_len);
+} dm_noesis_xaml_provider_vtable;
+
+void* dm_noesis_xaml_provider_create(
+    const dm_noesis_xaml_provider_vtable* vtable, void* userdata);
+void dm_noesis_xaml_provider_destroy(void* provider);
+
+// Install `provider` as the global XAML provider, or pass NULL to clear.
+void dm_noesis_set_xaml_provider(void* provider);
+
+// ── XAML loading + View + Renderer (Phase 4.C) ─────────────────────────────
+//
+// Opaque pointer contracts:
+//   - dm_noesis_gui_load_xaml returns a FrameworkElement* with refcount = 1.
+//     Release with dm_noesis_base_component_release.
+//   - dm_noesis_view_create returns an IView* with refcount = 1. Release with
+//     dm_noesis_view_destroy.
+//   - dm_noesis_view_get_renderer returns a borrowed IRenderer* owned by the
+//     View. Do NOT release.
+
+// Load XAML by URI. Returns a FrameworkElement* (+1 ref), or NULL if the
+// resolved root isn't a FrameworkElement or the URI wasn't found.
+void* dm_noesis_gui_load_xaml(const char* uri);
+
+// Release a BaseComponent-derived object.
+void dm_noesis_base_component_release(void* obj);
+
+// Create an IView whose root is `framework_element`. The view retains its own
+// reference to the element; the caller's reference is still held by the
+// FrameworkElement wrapper until it's dropped.
+void* dm_noesis_view_create(void* framework_element);
+
+// Release an IView* obtained from dm_noesis_view_create.
+void dm_noesis_view_destroy(void* view);
+
+void dm_noesis_view_set_size(void* view, uint32_t width, uint32_t height);
+
+// `matrix` is 16 floats, row-major (the native Matrix4::GetData() layout).
+void dm_noesis_view_set_projection_matrix(void* view, const float* matrix);
+
+bool dm_noesis_view_update(void* view, double time_seconds);
+
+void dm_noesis_view_set_flags(void* view, uint32_t flags);
+
+// Returns the IRenderer* owned by the View. Do NOT release.
+void* dm_noesis_view_get_renderer(void* view);
+
+// Initialize the renderer with `render_device`. The RenderDevice pointer is
+// the opaque value returned from dm_noesis_render_device_create.
+void dm_noesis_renderer_init(void* renderer, void* render_device);
+void dm_noesis_renderer_shutdown(void* renderer);
+bool dm_noesis_renderer_update_render_tree(void* renderer);
+bool dm_noesis_renderer_render_offscreen(void* renderer);
+void dm_noesis_renderer_render(void* renderer, bool flip_y, bool clear);
+
 #ifdef __cplusplus
 }
 #endif

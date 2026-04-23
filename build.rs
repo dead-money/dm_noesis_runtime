@@ -6,6 +6,7 @@ fn main() {
     println!("cargo:rerun-if-changed=cpp/noesis_shim.h");
     println!("cargo:rerun-if-changed=cpp/noesis_shim.cpp");
     println!("cargo:rerun-if-changed=cpp/noesis_render_device.cpp");
+    println!("cargo:rerun-if-changed=cpp/noesis_view.cpp");
 
     let sdk_dir = env::var("NOESIS_SDK_DIR").unwrap_or_else(|_| {
         panic!(
@@ -62,6 +63,7 @@ fn main() {
         .std("c++17")
         .file("cpp/noesis_shim.cpp")
         .file("cpp/noesis_render_device.cpp")
+        .file("cpp/noesis_view.cpp")
         .include(&include)
         .flag_if_supported("-Wno-unused-parameter");
 

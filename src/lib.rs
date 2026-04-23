@@ -14,6 +14,8 @@ use std::ffi::{CStr, CString};
 
 pub mod ffi;
 pub mod render_device;
+pub mod view;
+pub mod xaml_provider;
 
 /// Optional. Apply Indie license credentials before [`init`] to suppress the
 /// trial watermark. Pass empty strings (or skip the call) to run in trial mode.
