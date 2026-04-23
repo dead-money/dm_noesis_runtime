@@ -488,6 +488,72 @@ impl Default for UniformData {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Opaque C++ resource handles + the `Batch` struct passed to `DrawBatch`
+// ────────────────────────────────────────────────────────────────────────────
+
+/// Opaque handle to a `Noesis::Texture` instance.
+///
+/// Created by the device's `create_texture` callback (Phase 1.5 onwards) and
+/// referenced from `update_texture`, `Batch.pattern/ramps/image/glyphs/shadow`,
+/// and the other texture-bearing virtuals. Use only as `*mut Texture`; the
+/// type is uninhabited from Rust because the underlying class is owned by the
+/// C++ shim.
+#[repr(C)]
+pub struct Texture {
+    _opaque: [u8; 0],
+    /// Force `!Send + !Sync` and prevent direct construction.
+    _marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
+}
+
+/// Mirror of `Noesis::Batch` — a single indexed-triangle draw call.
+///
+/// Hot-path payload to `RenderDevice::draw_batch`. Texture pointers are null
+/// when unused. Vertex data starts at the most recent `map_vertices()` return
+/// plus `vertex_offset` bytes; indices are 16 bits each and start at the most
+/// recent `map_indices()` return plus `start_index * 2` bytes.
+#[repr(C)]
+#[derive(Debug)]
+pub struct Batch {
+    pub shader: Shader,
+    pub render_state: RenderState,
+    pub stencil_ref: u8,
+    /// When `true`, the batch renders both left and right eye images in one
+    /// pass (single-pass stereo).
+    pub single_pass_stereo: bool,
+
+    /// Byte offset into the most recent `map_vertices()` buffer.
+    pub vertex_offset: u32,
+    pub num_vertices: u32,
+    /// First index, in indices (multiply by 2 for the byte offset into the
+    /// most recent `map_indices()` buffer).
+    pub start_index: u32,
+    pub num_indices: u32,
+
+    pub pattern: *mut Texture,
+    pub ramps: *mut Texture,
+    pub image: *mut Texture,
+    pub glyphs: *mut Texture,
+    pub shadow: *mut Texture,
+
+    pub pattern_sampler: SamplerState,
+    pub ramps_sampler: SamplerState,
+    pub image_sampler: SamplerState,
+    pub glyphs_sampler: SamplerState,
+    pub shadow_sampler: SamplerState,
+
+    /// Vertex-shader uniform buffers, one per slot. `num_dwords == 0` marks
+    /// an unused slot.
+    pub vertex_uniforms: [UniformData; 2],
+    /// Pixel-shader uniform buffers, one per slot.
+    pub pixel_uniforms: [UniformData; 2],
+
+    /// Custom pixel-shader pointer (set via `ShaderEffect::SetPixelShader` or
+    /// `BrushShader::SetPixelShader`). Round-tripped through the device by
+    /// Phase 1; consumed by Phase 6 (custom effects).
+    pub pixel_shader: *mut c_void,
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Layout assertions — these fire at compile time if any mirror drifts from
 // the Noesis-side layout. Sizes for the byte-packed types are checked
 // explicitly; the `#[repr(C)]` enums get their size from the platform's int
@@ -518,3 +584,25 @@ const _: () = assert!(align_of::<UniformData>() == 8);
 const _: () = assert!(size_of::<UniformData>() == 12);
 #[cfg(target_pointer_width = "32")]
 const _: () = assert!(align_of::<UniformData>() == 4);
+
+// Batch layout (64-bit Itanium ABI):
+//   offset  0  shader              1
+//   offset  1  render_state        1
+//   offset  2  stencil_ref         1
+//   offset  3  single_pass_stereo  1
+//   offset  4  vertex_offset       4
+//   offset  8  num_vertices        4
+//   offset 12  start_index         4
+//   offset 16  num_indices         4
+//   offset 20  -- 4 bytes padding to 8-align textures
+//   offset 24  pattern .. shadow   5*8 = 40
+//   offset 64  pattern_sampler ..  5*1 = 5
+//   offset 69  -- 3 bytes padding to 8-align uniforms
+//   offset 72  vertex_uniforms[2]  2*16 = 32
+//   offset 104 pixel_uniforms[2]   2*16 = 32
+//   offset 136 pixel_shader        8
+//   offset 144 = total size, alignment 8
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<Batch>() == 144);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(align_of::<Batch>() == 8);
