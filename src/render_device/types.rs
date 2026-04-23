@@ -487,6 +487,33 @@ impl Default for UniformData {
     }
 }
 
+impl UniformData {
+    /// Borrow the uniform bytes as a slice. Returns an empty slice when
+    /// `num_dwords == 0` or `values` is null. Tightly packed; length is
+    /// `num_dwords * 4` bytes.
+    ///
+    /// Quarantines the dereference so `unsafe_code = forbid` crates (e.g.
+    /// `dm_noesis_bevy`) can consume Noesis uniforms without opting in
+    /// themselves.
+    ///
+    /// # Safety contract relied on
+    ///
+    /// Noesis guarantees `values` is valid for `num_dwords * 4` bytes for the
+    /// duration of the `DrawBatch` call this `UniformData` came from. Callers
+    /// must not retain the returned slice past the `draw_batch` callback
+    /// where the parent [`Batch`] was passed.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        if self.num_dwords == 0 || self.values.is_null() {
+            return &[];
+        }
+        // SAFETY: see method-level safety contract.
+        unsafe {
+            core::slice::from_raw_parts(self.values.cast::<u8>(), self.num_dwords as usize * 4)
+        }
+    }
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Opaque C++ resource handles + the `Batch` struct passed to `DrawBatch`
 // ────────────────────────────────────────────────────────────────────────────
