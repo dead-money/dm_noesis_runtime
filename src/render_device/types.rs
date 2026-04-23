@@ -538,6 +538,12 @@ pub struct Texture {
 /// when unused. Vertex data starts at the most recent `map_vertices()` return
 /// plus `vertex_offset` bytes; indices are 16 bits each and start at the most
 /// recent `map_indices()` return plus `start_index * 2` bytes.
+///
+/// The `*_handle()` helpers translate the opaque `*mut Texture` pointers
+/// (which come from Noesis and reference `RustTexture` instances inside the
+/// C++ shim) into the [`TextureHandle`] values originally returned by
+/// `RenderDevice::create_texture`. Safe to call: the shim getter does a
+/// null check and reads a stored handle field — no further dereferencing.
 #[repr(C)]
 #[derive(Debug)]
 pub struct Batch {
@@ -578,6 +584,60 @@ pub struct Batch {
     /// `BrushShader::SetPixelShader`). Round-tripped through the device by
     /// Phase 1; consumed by Phase 6 (custom effects).
     pub pixel_shader: *mut c_void,
+}
+
+impl Batch {
+    /// Translate the pattern texture pointer into the [`TextureHandle`] the
+    /// Rust-side device returned from `create_texture`. `None` when unused.
+    #[must_use]
+    pub fn pattern_handle(&self) -> Option<crate::render_device::TextureHandle> {
+        handle_from_texture_ptr(self.pattern)
+    }
+
+    /// As [`pattern_handle`](Self::pattern_handle) but for the ramps texture
+    /// (gradients).
+    #[must_use]
+    pub fn ramps_handle(&self) -> Option<crate::render_device::TextureHandle> {
+        handle_from_texture_ptr(self.ramps)
+    }
+
+    /// As [`pattern_handle`](Self::pattern_handle) but for the image texture
+    /// (offscreen opacity / effect input).
+    #[must_use]
+    pub fn image_handle(&self) -> Option<crate::render_device::TextureHandle> {
+        handle_from_texture_ptr(self.image)
+    }
+
+    /// As [`pattern_handle`](Self::pattern_handle) but for the glyph atlas
+    /// (SDF text).
+    #[must_use]
+    pub fn glyphs_handle(&self) -> Option<crate::render_device::TextureHandle> {
+        handle_from_texture_ptr(self.glyphs)
+    }
+
+    /// As [`pattern_handle`](Self::pattern_handle) but for the shadow
+    /// intermediate (shadow effect).
+    #[must_use]
+    pub fn shadow_handle(&self) -> Option<crate::render_device::TextureHandle> {
+        handle_from_texture_ptr(self.shadow)
+    }
+}
+
+/// Safely translate a Noesis-owned `Texture*` into its Rust-side handle.
+/// The shim getter is null-safe and performs a single member read; the
+/// pointer either came from `RenderDevice::create_texture` (and is live for
+/// the `draw_batch` call) or is null.
+fn handle_from_texture_ptr(ptr: *mut Texture) -> Option<crate::render_device::TextureHandle> {
+    if ptr.is_null() {
+        return None;
+    }
+    // SAFETY: Noesis owns Batch.* pointers and keeps them alive for the
+    // duration of the `draw_batch` call. The shim getter null-checks and
+    // reads `RustTexture::mHandle` without further dereferencing.
+    let raw = unsafe {
+        crate::render_device::ffi::dm_noesis_texture_get_handle(ptr.cast::<core::ffi::c_void>())
+    };
+    core::num::NonZeroU64::new(raw).map(crate::render_device::TextureHandle)
 }
 
 // ────────────────────────────────────────────────────────────────────────────
