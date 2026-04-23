@@ -56,12 +56,20 @@ fn main() {
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}", bin.display());
     }
 
-    cc::Build::new()
+    let mut build = cc::Build::new();
+    build
         .cpp(true)
         .std("c++17")
         .file("cpp/noesis_shim.cpp")
         .file("cpp/noesis_render_device.cpp")
         .include(&include)
-        .flag_if_supported("-Wno-unused-parameter")
-        .compile("dm_noesis_shim");
+        .flag_if_supported("-Wno-unused-parameter");
+
+    // The `test-utils` Cargo feature gates the dm_noesis_test_* C entrypoints
+    // (defined in noesis_render_device.cpp under #ifdef DM_NOESIS_TEST_UTILS).
+    if env::var_os("CARGO_FEATURE_TEST_UTILS").is_some() {
+        build.define("DM_NOESIS_TEST_UTILS", None);
+    }
+
+    build.compile("dm_noesis_shim");
 }

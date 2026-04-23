@@ -268,3 +268,103 @@ extern "C" uint64_t dm_noesis_render_target_get_handle(const void* surface) {
     return static_cast<const RustRenderTarget*>(
                static_cast<const Noesis::RenderTarget*>(surface))->handle();
 }
+
+// ─── Test-only entrypoints ─────────────────────────────────────────────────
+//
+// Gated by the `test-utils` Cargo feature (which sets DM_NOESIS_TEST_UTILS).
+// Production builds omit them entirely.
+
+#ifdef DM_NOESIS_TEST_UTILS
+
+// One-shot frame scenario that exercises every Noesis virtual the device
+// implements, in the documented frame-protocol order. Lets all Ptr<>s die at
+// function exit so drop_texture / drop_render_target fire and the Rust mock
+// can observe the cleanup ordering.
+//
+// Used by tests/render_device.rs.
+extern "C" void dm_noesis_test_run_frame_scenario(void* device_ptr) {
+    auto* device = static_cast<RustRenderDevice*>(device_ptr);
+
+    // ── Caps query (cached after first call) ───────────────────────────────
+    (void)device->GetCaps();
+
+    // ── Create textures ────────────────────────────────────────────────────
+    static const uint32_t pixels4x4_rgba8[16] = {
+        0xff0000ff, 0xff00ff00, 0xffff0000, 0xffffffff,
+        0xff0000ff, 0xff00ff00, 0xffff0000, 0xffffffff,
+        0xff0000ff, 0xff00ff00, 0xffff0000, 0xffffffff,
+        0xff0000ff, 0xff00ff00, 0xffff0000, 0xffffffff,
+    };
+    const void* immutable_data[1] = { pixels4x4_rgba8 };
+
+    Noesis::Ptr<Noesis::Texture> t_immutable = device->CreateTexture(
+        "t_immutable", 4, 4, 1, Noesis::TextureFormat::RGBA8, immutable_data);
+
+    Noesis::Ptr<Noesis::Texture> t_dynamic = device->CreateTexture(
+        "t_dynamic", 16, 16, 1, Noesis::TextureFormat::R8, nullptr);
+
+    static const uint8_t patch4x4_r8[16] = {
+        0x10, 0x20, 0x30, 0x40,
+        0x50, 0x60, 0x70, 0x80,
+        0x90, 0xa0, 0xb0, 0xc0,
+        0xd0, 0xe0, 0xf0, 0xff,
+    };
+    device->UpdateTexture(t_dynamic.GetPtr(), 0, 2, 2, 4, 4, patch4x4_r8);
+
+    Noesis::Texture* dirty[1] = { t_dynamic.GetPtr() };
+    device->EndUpdatingTextures(dirty, 1);
+
+    // ── Create render target ───────────────────────────────────────────────
+    Noesis::Ptr<Noesis::RenderTarget> rt = device->CreateRenderTarget(
+        "rt_main", 256, 256, 1, true);
+
+    // ── Offscreen phase ────────────────────────────────────────────────────
+    device->BeginOffscreenRender();
+    device->SetRenderTarget(rt.GetPtr());
+    Noesis::Tile tile = { 0, 0, 256, 256 };
+    device->BeginTile(rt.GetPtr(), tile);
+
+    (void)device->MapVertices(96);
+    device->UnmapVertices();
+    (void)device->MapIndices(36);
+    device->UnmapIndices();
+
+    Noesis::Batch offscreen_batch{};
+    offscreen_batch.shader.v = Noesis::Shader::Path_Solid;
+    offscreen_batch.numVertices = 4;
+    offscreen_batch.numIndices = 6;
+    device->DrawBatch(offscreen_batch);
+
+    device->EndTile(rt.GetPtr());
+    device->ResolveRenderTarget(rt.GetPtr(), &tile, 1);
+    device->EndOffscreenRender();
+
+    // ── Onscreen phase ─────────────────────────────────────────────────────
+    device->BeginOnscreenRender();
+
+    (void)device->MapVertices(96);
+    device->UnmapVertices();
+    (void)device->MapIndices(36);
+    device->UnmapIndices();
+
+    Noesis::Batch onscreen_batch{};
+    onscreen_batch.shader.v = Noesis::Shader::RGBA;
+    onscreen_batch.numVertices = 4;
+    onscreen_batch.numIndices = 6;
+    device->DrawBatch(onscreen_batch);
+
+    device->EndOnscreenRender();
+
+    // ── Clone (exercises clone_render_target) ──────────────────────────────
+    Noesis::Ptr<Noesis::RenderTarget> rt_clone = device->CloneRenderTarget(
+        "rt_clone", rt.GetPtr());
+    (void)rt_clone;
+
+    // Function exit destroys (in reverse declaration order):
+    //   rt_clone     → drop_render_target(clone) + drop_texture(clone resolve)
+    //   rt           → drop_render_target(main)  + drop_texture(main resolve)
+    //   t_dynamic    → drop_texture(dynamic)
+    //   t_immutable  → drop_texture(immutable)
+}
+
+#endif  // DM_NOESIS_TEST_UTILS

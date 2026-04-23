@@ -7,6 +7,12 @@ repository = "https://github.com/dead-money/dm_noesis"
 publish = false
 links = "Noesis"
 
+[features]
+default = []
+# Enables the dm_noesis_test_* C entrypoints used by tests/render_device.rs.
+# Off by default so production builds don't carry the test helpers.
+test-utils = []
+
 [dependencies]
 thiserror = "2"
 

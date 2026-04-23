@@ -151,3 +151,18 @@ unsafe extern "C" {
     pub fn dm_noesis_texture_get_handle(texture: *const c_void) -> u64;
     pub fn dm_noesis_render_target_get_handle(surface: *const c_void) -> u64;
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Test-only entrypoints — gated by the `test-utils` Cargo feature, which
+// defines `DM_NOESIS_TEST_UTILS` for the C++ build.
+// ────────────────────────────────────────────────────────────────────────────
+
+#[cfg(feature = "test-utils")]
+unsafe extern "C" {
+    /// Drive the C++ device through one representative frame (caps query,
+    /// texture create + update, render target create, offscreen + onscreen
+    /// passes with map/draw/unmap, RT clone) then let every `Ptr<>` die so
+    /// `drop_texture` / `drop_render_target` fire on the way out. Used by
+    /// `tests/render_device.rs` to assert the recorded op sequence.
+    pub fn dm_noesis_test_run_frame_scenario(device: *mut c_void);
+}
