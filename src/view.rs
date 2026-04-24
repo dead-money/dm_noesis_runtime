@@ -21,9 +21,14 @@ use std::ffi::{c_void, CString};
 use crate::ffi::{
     dm_noesis_base_component_release, dm_noesis_gui_load_xaml, dm_noesis_renderer_init,
     dm_noesis_renderer_render, dm_noesis_renderer_render_offscreen, dm_noesis_renderer_shutdown,
-    dm_noesis_renderer_update_render_tree, dm_noesis_view_create, dm_noesis_view_destroy,
-    dm_noesis_view_get_renderer, dm_noesis_view_set_flags, dm_noesis_view_set_projection_matrix,
-    dm_noesis_view_set_size, dm_noesis_view_update,
+    dm_noesis_renderer_update_render_tree, dm_noesis_view_activate, dm_noesis_view_char,
+    dm_noesis_view_create, dm_noesis_view_deactivate, dm_noesis_view_destroy,
+    dm_noesis_view_get_renderer, dm_noesis_view_hscroll, dm_noesis_view_key_down,
+    dm_noesis_view_key_up, dm_noesis_view_mouse_button_down, dm_noesis_view_mouse_button_up,
+    dm_noesis_view_mouse_double_click, dm_noesis_view_mouse_move, dm_noesis_view_mouse_wheel,
+    dm_noesis_view_scroll, dm_noesis_view_set_flags, dm_noesis_view_set_projection_matrix,
+    dm_noesis_view_set_size, dm_noesis_view_touch_down, dm_noesis_view_touch_move,
+    dm_noesis_view_touch_up, dm_noesis_view_update,
 };
 use crate::render_device::Registered as RegisteredDevice;
 
@@ -136,6 +141,80 @@ impl View {
         unsafe { dm_noesis_view_set_flags(self.ptr.as_ptr(), flags) }
     }
 
+    /// Recover keyboard focus for this view. Noesis ignores keyboard input
+    /// until a view is activated.
+    pub fn activate(&mut self) {
+        unsafe { dm_noesis_view_activate(self.ptr.as_ptr()) }
+    }
+
+    /// Release keyboard focus.
+    pub fn deactivate(&mut self) {
+        unsafe { dm_noesis_view_deactivate(self.ptr.as_ptr()) }
+    }
+
+    /// Pointer position, in physical pixels, origin top-left. Noesis
+    /// requires a `mouse_move` at the press coordinate before a
+    /// [`Self::mouse_button_down`] or [`Self::touch_down`] will hit-test
+    /// correctly; callers must ensure the ordering.
+    pub fn mouse_move(&mut self, x: i32, y: i32) -> bool {
+        unsafe { dm_noesis_view_mouse_move(self.ptr.as_ptr(), x, y) }
+    }
+
+    pub fn mouse_button_down(&mut self, x: i32, y: i32, button: MouseButton) -> bool {
+        unsafe { dm_noesis_view_mouse_button_down(self.ptr.as_ptr(), x, y, button as i32) }
+    }
+
+    pub fn mouse_button_up(&mut self, x: i32, y: i32, button: MouseButton) -> bool {
+        unsafe { dm_noesis_view_mouse_button_up(self.ptr.as_ptr(), x, y, button as i32) }
+    }
+
+    pub fn mouse_double_click(&mut self, x: i32, y: i32, button: MouseButton) -> bool {
+        unsafe { dm_noesis_view_mouse_double_click(self.ptr.as_ptr(), x, y, button as i32) }
+    }
+
+    /// `delta` is signed — Noesis uses Windows-style 120 units per notch.
+    pub fn mouse_wheel(&mut self, x: i32, y: i32, delta: i32) -> bool {
+        unsafe { dm_noesis_view_mouse_wheel(self.ptr.as_ptr(), x, y, delta) }
+    }
+
+    /// Vertical scroll with the cursor at `(x, y)`. `value` is in lines
+    /// (per WPF convention — integer lines, fractional allowed).
+    pub fn scroll(&mut self, x: i32, y: i32, value: f32) -> bool {
+        unsafe { dm_noesis_view_scroll(self.ptr.as_ptr(), x, y, value) }
+    }
+
+    /// Horizontal scroll. See [`Self::scroll`].
+    pub fn hscroll(&mut self, x: i32, y: i32, value: f32) -> bool {
+        unsafe { dm_noesis_view_hscroll(self.ptr.as_ptr(), x, y, value) }
+    }
+
+    pub fn touch_down(&mut self, x: i32, y: i32, id: u64) -> bool {
+        unsafe { dm_noesis_view_touch_down(self.ptr.as_ptr(), x, y, id) }
+    }
+
+    pub fn touch_move(&mut self, x: i32, y: i32, id: u64) -> bool {
+        unsafe { dm_noesis_view_touch_move(self.ptr.as_ptr(), x, y, id) }
+    }
+
+    pub fn touch_up(&mut self, x: i32, y: i32, id: u64) -> bool {
+        unsafe { dm_noesis_view_touch_up(self.ptr.as_ptr(), x, y, id) }
+    }
+
+    pub fn key_down(&mut self, key: Key) -> bool {
+        unsafe { dm_noesis_view_key_down(self.ptr.as_ptr(), key as i32) }
+    }
+
+    pub fn key_up(&mut self, key: Key) -> bool {
+        unsafe { dm_noesis_view_key_up(self.ptr.as_ptr(), key as i32) }
+    }
+
+    /// Text-input codepoint. Send between the matching
+    /// [`Self::key_down`]/[`Self::key_up`] pair for the key that produced
+    /// the character.
+    pub fn char_input(&mut self, codepoint: u32) -> bool {
+        unsafe { dm_noesis_view_char(self.ptr.as_ptr(), codepoint) }
+    }
+
     /// Run layout + record a snapshot for the renderer. Returns `false` when
     /// nothing changed and skipping the render pair is safe.
     pub fn update(&mut self, time_seconds: f64) -> bool {
@@ -170,6 +249,153 @@ impl Drop for View {
         // SAFETY: produced by dm_noesis_view_create which returns +1 ref.
         unsafe { dm_noesis_view_destroy(self.ptr.as_ptr()) }
     }
+}
+
+/// Mirror of `Noesis::MouseButton` from `NsGui/InputEnums.h`. Ordinals
+/// validated at C++ compile time via `static_assert` in `noesis_view.cpp`.
+#[repr(i32)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum MouseButton {
+    Left = 0,
+    Right = 1,
+    Middle = 2,
+    XButton1 = 3,
+    XButton2 = 4,
+}
+
+/// Subset of `Noesis::Key` from `NsGui/InputEnums.h` — the keys Bevy's
+/// `KeyCode` can produce. Values are the C++ enum ordinals, validated by
+/// `static_assert` in `noesis_view.cpp`. Anything outside this subset can
+/// still be sent via [`View::key_down`] with a raw cast; prefer adding a
+/// variant here (and a matching assert in C++) to centralize the mapping.
+#[repr(i32)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Key {
+    None = 0,
+    Back = 2,
+    Tab = 3,
+    Return = 6,
+    Pause = 7,
+    CapsLock = 8,
+    Escape = 13,
+    Space = 18,
+    PageUp = 19,
+    PageDown = 20,
+    End = 21,
+    Home = 22,
+    Left = 23,
+    Up = 24,
+    Right = 25,
+    Down = 26,
+    PrintScreen = 30,
+    Insert = 31,
+    Delete = 32,
+    Help = 33,
+    D0 = 34,
+    D1 = 35,
+    D2 = 36,
+    D3 = 37,
+    D4 = 38,
+    D5 = 39,
+    D6 = 40,
+    D7 = 41,
+    D8 = 42,
+    D9 = 43,
+    A = 44,
+    B = 45,
+    C = 46,
+    D = 47,
+    E = 48,
+    F = 49,
+    G = 50,
+    H = 51,
+    I = 52,
+    J = 53,
+    K = 54,
+    L = 55,
+    M = 56,
+    N = 57,
+    O = 58,
+    P = 59,
+    Q = 60,
+    R = 61,
+    S = 62,
+    T = 63,
+    U = 64,
+    V = 65,
+    W = 66,
+    X = 67,
+    Y = 68,
+    Z = 69,
+    LWin = 70,
+    RWin = 71,
+    Apps = 72,
+    NumPad0 = 74,
+    NumPad1 = 75,
+    NumPad2 = 76,
+    NumPad3 = 77,
+    NumPad4 = 78,
+    NumPad5 = 79,
+    NumPad6 = 80,
+    NumPad7 = 81,
+    NumPad8 = 82,
+    NumPad9 = 83,
+    Multiply = 84,
+    Add = 85,
+    Subtract = 87,
+    Decimal = 88,
+    Divide = 89,
+    F1 = 90,
+    F2 = 91,
+    F3 = 92,
+    F4 = 93,
+    F5 = 94,
+    F6 = 95,
+    F7 = 96,
+    F8 = 97,
+    F9 = 98,
+    F10 = 99,
+    F11 = 100,
+    F12 = 101,
+    F13 = 102,
+    F14 = 103,
+    F15 = 104,
+    F16 = 105,
+    F17 = 106,
+    F18 = 107,
+    F19 = 108,
+    F20 = 109,
+    F21 = 110,
+    F22 = 111,
+    F23 = 112,
+    F24 = 113,
+    NumLock = 114,
+    ScrollLock = 115,
+    LeftShift = 116,
+    RightShift = 117,
+    LeftCtrl = 118,
+    RightCtrl = 119,
+    LeftAlt = 120,
+    RightAlt = 121,
+    /// Semicolon / colon on US layouts (`Key_Oem1` / `Key_OemSemicolon`).
+    OemSemicolon = 140,
+    /// `=` / `+` (`Key_OemPlus`).
+    OemPlus = 141,
+    OemComma = 142,
+    OemMinus = 143,
+    OemPeriod = 144,
+    /// `/` / `?` (`Key_Oem2` / `Key_OemQuestion`).
+    OemSlash = 145,
+    /// Backtick / tilde (`Key_Oem3` / `Key_OemTilde`).
+    OemTilde = 146,
+    /// `[` / `{` (`Key_Oem4` / `Key_OemOpenBrackets`).
+    OemOpenBrackets = 149,
+    /// `\` / `|` (`Key_Oem5` / `Key_OemPipe`).
+    OemPipe = 150,
+    /// `]` / `}` (`Key_Oem6` / `Key_OemCloseBrackets`).
+    OemCloseBrackets = 151,
+    /// `'` / `"` (`Key_Oem7` / `Key_OemQuotes`).
+    OemQuotes = 152,
 }
 
 /// `Noesis::RenderFlags` bit values mirrored for convenience. See

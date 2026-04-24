@@ -282,6 +282,35 @@ bool dm_noesis_renderer_update_render_tree(void* renderer);
 bool dm_noesis_renderer_render_offscreen(void* renderer);
 void dm_noesis_renderer_render(void* renderer, bool flip_y, bool clear);
 
+// ── View input (Phase 5) ───────────────────────────────────────────────────
+//
+// Thin trampolines over `Noesis::IView` input methods. `button` takes a
+// `Noesis::MouseButton` value (see InputEnums.h); `key` takes a `Noesis::Key`.
+// Out-of-range values are passed through — Noesis ignores unknown keys.
+//
+// Noesis requires a `MouseMove` at the press coordinate before a
+// `MouseButtonDown` hits the correct element; callers must enqueue moves
+// before buttons themselves.
+
+bool dm_noesis_view_mouse_move(void* view, int32_t x, int32_t y);
+bool dm_noesis_view_mouse_button_down(void* view, int32_t x, int32_t y, int32_t button);
+bool dm_noesis_view_mouse_button_up(void* view, int32_t x, int32_t y, int32_t button);
+bool dm_noesis_view_mouse_double_click(void* view, int32_t x, int32_t y, int32_t button);
+bool dm_noesis_view_mouse_wheel(void* view, int32_t x, int32_t y, int32_t delta);
+bool dm_noesis_view_scroll(void* view, int32_t x, int32_t y, float value);
+bool dm_noesis_view_hscroll(void* view, int32_t x, int32_t y, float value);
+
+bool dm_noesis_view_touch_down(void* view, int32_t x, int32_t y, uint64_t id);
+bool dm_noesis_view_touch_move(void* view, int32_t x, int32_t y, uint64_t id);
+bool dm_noesis_view_touch_up(void* view, int32_t x, int32_t y, uint64_t id);
+
+bool dm_noesis_view_key_down(void* view, int32_t key);
+bool dm_noesis_view_key_up(void* view, int32_t key);
+bool dm_noesis_view_char(void* view, uint32_t codepoint);
+
+void dm_noesis_view_activate(void* view);
+void dm_noesis_view_deactivate(void* view);
+
 #ifdef __cplusplus
 }
 #endif

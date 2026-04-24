@@ -100,4 +100,29 @@ unsafe extern "C" {
     pub fn dm_noesis_renderer_update_render_tree(renderer: *mut c_void) -> bool;
     pub fn dm_noesis_renderer_render_offscreen(renderer: *mut c_void) -> bool;
     pub fn dm_noesis_renderer_render(renderer: *mut c_void, flip_y: bool, clear: bool);
+
+    pub fn dm_noesis_view_mouse_move(view: *mut c_void, x: i32, y: i32) -> bool;
+    pub fn dm_noesis_view_mouse_button_down(view: *mut c_void, x: i32, y: i32, button: i32)
+        -> bool;
+    pub fn dm_noesis_view_mouse_button_up(view: *mut c_void, x: i32, y: i32, button: i32) -> bool;
+    pub fn dm_noesis_view_mouse_double_click(
+        view: *mut c_void,
+        x: i32,
+        y: i32,
+        button: i32,
+    ) -> bool;
+    pub fn dm_noesis_view_mouse_wheel(view: *mut c_void, x: i32, y: i32, delta: i32) -> bool;
+    pub fn dm_noesis_view_scroll(view: *mut c_void, x: i32, y: i32, value: f32) -> bool;
+    pub fn dm_noesis_view_hscroll(view: *mut c_void, x: i32, y: i32, value: f32) -> bool;
+
+    pub fn dm_noesis_view_touch_down(view: *mut c_void, x: i32, y: i32, id: u64) -> bool;
+    pub fn dm_noesis_view_touch_move(view: *mut c_void, x: i32, y: i32, id: u64) -> bool;
+    pub fn dm_noesis_view_touch_up(view: *mut c_void, x: i32, y: i32, id: u64) -> bool;
+
+    pub fn dm_noesis_view_key_down(view: *mut c_void, key: i32) -> bool;
+    pub fn dm_noesis_view_key_up(view: *mut c_void, key: i32) -> bool;
+    pub fn dm_noesis_view_char(view: *mut c_void, codepoint: u32) -> bool;
+
+    pub fn dm_noesis_view_activate(view: *mut c_void);
+    pub fn dm_noesis_view_deactivate(view: *mut c_void);
 }

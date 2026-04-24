@@ -18,6 +18,7 @@
 #include <NsCore/Ptr.h>
 #include <NsCore/DynamicCast.h>
 #include <NsGui/FrameworkElement.h>
+#include <NsGui/InputEnums.h>
 #include <NsGui/IntegrationAPI.h>
 #include <NsGui/IRenderer.h>
 #include <NsGui/IView.h>
@@ -164,4 +165,136 @@ extern "C" bool dm_noesis_renderer_render_offscreen(void* renderer) {
 
 extern "C" void dm_noesis_renderer_render(void* renderer, bool flip_y, bool clear) {
     static_cast<Noesis::IRenderer*>(renderer)->Render(flip_y, clear);
+}
+
+// ── View input ─────────────────────────────────────────────────────────────
+//
+// The safe wrappers in `src/view.rs` define `MouseButton` and `Key` enums with
+// explicit discriminants. Assert each ordinal here so any accidental drift
+// between Noesis SDK versions fails dm_noesis's own C++ compile, long before
+// a wrong-key bug shows up at runtime.
+
+static_assert((int32_t)Noesis::MouseButton_Left == 0, "MouseButton::Left");
+static_assert((int32_t)Noesis::MouseButton_Right == 1, "MouseButton::Right");
+static_assert((int32_t)Noesis::MouseButton_Middle == 2, "MouseButton::Middle");
+static_assert((int32_t)Noesis::MouseButton_XButton1 == 3, "MouseButton::XButton1");
+static_assert((int32_t)Noesis::MouseButton_XButton2 == 4, "MouseButton::XButton2");
+
+static_assert((int32_t)Noesis::Key_None == 0, "Key::None");
+static_assert((int32_t)Noesis::Key_Back == 2, "Key::Back");
+static_assert((int32_t)Noesis::Key_Tab == 3, "Key::Tab");
+static_assert((int32_t)Noesis::Key_Return == 6, "Key::Return");
+static_assert((int32_t)Noesis::Key_Pause == 7, "Key::Pause");
+static_assert((int32_t)Noesis::Key_CapsLock == 8, "Key::CapsLock");
+static_assert((int32_t)Noesis::Key_Escape == 13, "Key::Escape");
+static_assert((int32_t)Noesis::Key_Space == 18, "Key::Space");
+static_assert((int32_t)Noesis::Key_PageUp == 19, "Key::PageUp");
+static_assert((int32_t)Noesis::Key_PageDown == 20, "Key::PageDown");
+static_assert((int32_t)Noesis::Key_End == 21, "Key::End");
+static_assert((int32_t)Noesis::Key_Home == 22, "Key::Home");
+static_assert((int32_t)Noesis::Key_Left == 23, "Key::Left");
+static_assert((int32_t)Noesis::Key_Up == 24, "Key::Up");
+static_assert((int32_t)Noesis::Key_Right == 25, "Key::Right");
+static_assert((int32_t)Noesis::Key_Down == 26, "Key::Down");
+static_assert((int32_t)Noesis::Key_PrintScreen == 30, "Key::PrintScreen");
+static_assert((int32_t)Noesis::Key_Insert == 31, "Key::Insert");
+static_assert((int32_t)Noesis::Key_Delete == 32, "Key::Delete");
+static_assert((int32_t)Noesis::Key_Help == 33, "Key::Help");
+static_assert((int32_t)Noesis::Key_D0 == 34, "Key::D0");
+static_assert((int32_t)Noesis::Key_D9 == 43, "Key::D9");
+static_assert((int32_t)Noesis::Key_A == 44, "Key::A");
+static_assert((int32_t)Noesis::Key_Z == 69, "Key::Z");
+static_assert((int32_t)Noesis::Key_LWin == 70, "Key::LWin");
+static_assert((int32_t)Noesis::Key_RWin == 71, "Key::RWin");
+static_assert((int32_t)Noesis::Key_Apps == 72, "Key::Apps");
+static_assert((int32_t)Noesis::Key_NumPad0 == 74, "Key::NumPad0");
+static_assert((int32_t)Noesis::Key_NumPad9 == 83, "Key::NumPad9");
+static_assert((int32_t)Noesis::Key_Multiply == 84, "Key::Multiply");
+static_assert((int32_t)Noesis::Key_Add == 85, "Key::Add");
+static_assert((int32_t)Noesis::Key_Subtract == 87, "Key::Subtract");
+static_assert((int32_t)Noesis::Key_Decimal == 88, "Key::Decimal");
+static_assert((int32_t)Noesis::Key_Divide == 89, "Key::Divide");
+static_assert((int32_t)Noesis::Key_F1 == 90, "Key::F1");
+static_assert((int32_t)Noesis::Key_F24 == 113, "Key::F24");
+static_assert((int32_t)Noesis::Key_NumLock == 114, "Key::NumLock");
+static_assert((int32_t)Noesis::Key_Scroll == 115, "Key::ScrollLock");
+static_assert((int32_t)Noesis::Key_LeftShift == 116, "Key::LeftShift");
+static_assert((int32_t)Noesis::Key_RightShift == 117, "Key::RightShift");
+static_assert((int32_t)Noesis::Key_LeftCtrl == 118, "Key::LeftCtrl");
+static_assert((int32_t)Noesis::Key_RightCtrl == 119, "Key::RightCtrl");
+static_assert((int32_t)Noesis::Key_LeftAlt == 120, "Key::LeftAlt");
+static_assert((int32_t)Noesis::Key_RightAlt == 121, "Key::RightAlt");
+static_assert((int32_t)Noesis::Key_OemSemicolon == 140, "Key::OemSemicolon");
+static_assert((int32_t)Noesis::Key_OemPlus == 141, "Key::OemPlus");
+static_assert((int32_t)Noesis::Key_OemComma == 142, "Key::OemComma");
+static_assert((int32_t)Noesis::Key_OemMinus == 143, "Key::OemMinus");
+static_assert((int32_t)Noesis::Key_OemPeriod == 144, "Key::OemPeriod");
+static_assert((int32_t)Noesis::Key_OemQuestion == 145, "Key::OemSlash");
+static_assert((int32_t)Noesis::Key_OemTilde == 146, "Key::OemTilde");
+static_assert((int32_t)Noesis::Key_OemOpenBrackets == 149, "Key::OemOpenBrackets");
+static_assert((int32_t)Noesis::Key_OemPipe == 150, "Key::OemPipe");
+static_assert((int32_t)Noesis::Key_OemCloseBrackets == 151, "Key::OemCloseBrackets");
+static_assert((int32_t)Noesis::Key_OemQuotes == 152, "Key::OemQuotes");
+
+extern "C" bool dm_noesis_view_mouse_move(void* view, int32_t x, int32_t y) {
+    return static_cast<Noesis::IView*>(view)->MouseMove(x, y);
+}
+
+extern "C" bool dm_noesis_view_mouse_button_down(void* view, int32_t x, int32_t y, int32_t button) {
+    return static_cast<Noesis::IView*>(view)
+        ->MouseButtonDown(x, y, static_cast<Noesis::MouseButton>(button));
+}
+
+extern "C" bool dm_noesis_view_mouse_button_up(void* view, int32_t x, int32_t y, int32_t button) {
+    return static_cast<Noesis::IView*>(view)
+        ->MouseButtonUp(x, y, static_cast<Noesis::MouseButton>(button));
+}
+
+extern "C" bool dm_noesis_view_mouse_double_click(void* view, int32_t x, int32_t y, int32_t button) {
+    return static_cast<Noesis::IView*>(view)
+        ->MouseDoubleClick(x, y, static_cast<Noesis::MouseButton>(button));
+}
+
+extern "C" bool dm_noesis_view_mouse_wheel(void* view, int32_t x, int32_t y, int32_t delta) {
+    return static_cast<Noesis::IView*>(view)->MouseWheel(x, y, delta);
+}
+
+extern "C" bool dm_noesis_view_scroll(void* view, int32_t x, int32_t y, float value) {
+    return static_cast<Noesis::IView*>(view)->Scroll(x, y, value);
+}
+
+extern "C" bool dm_noesis_view_hscroll(void* view, int32_t x, int32_t y, float value) {
+    return static_cast<Noesis::IView*>(view)->HScroll(x, y, value);
+}
+
+extern "C" bool dm_noesis_view_touch_down(void* view, int32_t x, int32_t y, uint64_t id) {
+    return static_cast<Noesis::IView*>(view)->TouchDown(x, y, id);
+}
+
+extern "C" bool dm_noesis_view_touch_move(void* view, int32_t x, int32_t y, uint64_t id) {
+    return static_cast<Noesis::IView*>(view)->TouchMove(x, y, id);
+}
+
+extern "C" bool dm_noesis_view_touch_up(void* view, int32_t x, int32_t y, uint64_t id) {
+    return static_cast<Noesis::IView*>(view)->TouchUp(x, y, id);
+}
+
+extern "C" bool dm_noesis_view_key_down(void* view, int32_t key) {
+    return static_cast<Noesis::IView*>(view)->KeyDown(static_cast<Noesis::Key>(key));
+}
+
+extern "C" bool dm_noesis_view_key_up(void* view, int32_t key) {
+    return static_cast<Noesis::IView*>(view)->KeyUp(static_cast<Noesis::Key>(key));
+}
+
+extern "C" bool dm_noesis_view_char(void* view, uint32_t codepoint) {
+    return static_cast<Noesis::IView*>(view)->Char(codepoint);
+}
+
+extern "C" void dm_noesis_view_activate(void* view) {
+    static_cast<Noesis::IView*>(view)->Activate();
+}
+
+extern "C" void dm_noesis_view_deactivate(void* view) {
+    static_cast<Noesis::IView*>(view)->Deactivate();
 }
