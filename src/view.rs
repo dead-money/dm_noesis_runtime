@@ -34,6 +34,21 @@ pub struct FrameworkElement {
     ptr: NonNull<c_void>,
 }
 
+// SAFETY: `FrameworkElement` wraps a raw pointer to a Noesis-owned
+// `Ptr<FrameworkElement>`. Noesis's API contract is "calls on a given object
+// are serialized to one thread" — not "the object must stay on one thread
+// for its whole lifetime." Moving a FrameworkElement between threads (via
+// `Send`) is safe as long as the receiving thread is the only one making
+// subsequent calls. Bevy's resource scheduler guarantees that: access to
+// a `Resource` is serialized through `ResMut<_>`, and our callers only
+// hold the element across a single render-thread borrow.
+//
+// `Sync` is safe for essentially the same reason: every mutating method
+// takes `&mut self`, so `&FrameworkElement` carries no usable calls to
+// Noesis — concurrent shared borrows can't race on Noesis state.
+unsafe impl Send for FrameworkElement {}
+unsafe impl Sync for FrameworkElement {}
+
 impl FrameworkElement {
     /// Load XAML by URI. Returns `None` when the URI is unknown to the
     /// installed `XamlProvider` or when the loaded root is not a
@@ -72,6 +87,14 @@ impl Drop for FrameworkElement {
 pub struct View {
     ptr: NonNull<c_void>,
 }
+
+// SAFETY: same rationale as [`FrameworkElement`] — Noesis serialises
+// per-object calls to one thread at a time; every `View` method is `&mut
+// self`; Bevy's scheduler prevents concurrent access. Moving a View between
+// threads, or holding a `&View` from multiple threads simultaneously (which
+// offers no usable mutation), is safe.
+unsafe impl Send for View {}
+unsafe impl Sync for View {}
 
 impl View {
     /// Create a View whose root is `content`. Consumes the
@@ -172,6 +195,11 @@ pub struct Renderer<'a> {
     ptr: NonNull<c_void>,
     _view: PhantomData<&'a mut View>,
 }
+
+// SAFETY: mirrors [`View`]. `Renderer` is a transient borrow that shares
+// thread-safety properties with the `View` it was produced from.
+unsafe impl Send for Renderer<'_> {}
+unsafe impl Sync for Renderer<'_> {}
 
 impl Renderer<'_> {
     /// Bind the Noesis renderer to `render_device`. Must be called once

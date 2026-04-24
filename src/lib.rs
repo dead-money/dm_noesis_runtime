@@ -13,6 +13,7 @@
 use std::ffi::{CStr, CString};
 
 pub mod ffi;
+pub mod font_provider;
 pub mod render_device;
 pub mod view;
 pub mod xaml_provider;

@@ -47,6 +47,28 @@ pub struct XamlProviderVTable {
     ) -> bool,
 }
 
+/// Callback signature the C++ side passes into `scan_folder` so Rust can
+/// register each font filename synchronously. `register_cx` is opaque to
+/// Rust — pass it back verbatim.
+pub type RegisterFontFn = unsafe extern "C" fn(register_cx: *mut c_void, filename: *const c_char);
+
+#[repr(C)]
+pub struct FontProviderVTable {
+    pub scan_folder: unsafe extern "C" fn(
+        userdata: *mut c_void,
+        folder_uri: *const c_char,
+        register_fn: RegisterFontFn,
+        register_cx: *mut c_void,
+    ),
+    pub open_font: unsafe extern "C" fn(
+        userdata: *mut c_void,
+        folder_uri: *const c_char,
+        filename: *const c_char,
+        out_data: *mut *const u8,
+        out_len: *mut u32,
+    ) -> bool,
+}
+
 unsafe extern "C" {
     pub fn dm_noesis_xaml_provider_create(
         vtable: *const XamlProviderVTable,
@@ -54,6 +76,13 @@ unsafe extern "C" {
     ) -> *mut c_void;
     pub fn dm_noesis_xaml_provider_destroy(provider: *mut c_void);
     pub fn dm_noesis_set_xaml_provider(provider: *mut c_void);
+
+    pub fn dm_noesis_font_provider_create(
+        vtable: *const FontProviderVTable,
+        userdata: *mut c_void,
+    ) -> *mut c_void;
+    pub fn dm_noesis_font_provider_destroy(provider: *mut c_void);
+    pub fn dm_noesis_set_font_provider(provider: *mut c_void);
 
     pub fn dm_noesis_gui_load_xaml(uri: *const c_char) -> *mut c_void;
     pub fn dm_noesis_base_component_release(obj: *mut c_void);

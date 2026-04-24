@@ -333,6 +333,16 @@ pub struct Registered {
     userdata: NonNull<Box<dyn RenderDevice>>,
 }
 
+// SAFETY: `RenderDevice: Send + Sync` (supertrait bound), so the boxed impl
+// behind `userdata` is Send + Sync. `handle` points at a C++
+// `Noesis::RenderDevice*` whose methods are called by Noesis from a single
+// serialized thread — Send (moving the whole guard between threads) is safe
+// because Noesis doesn't care which thread hands it the handle, only that
+// per-object calls don't race. Sync is trivially safe because there are no
+// `&Registered` methods that call into Noesis.
+unsafe impl Send for Registered {}
+unsafe impl Sync for Registered {}
+
 impl Registered {
     /// Raw `Noesis::RenderDevice*` for handing to other Noesis APIs that take
     /// a render device (e.g. `IView::SetRenderer`). Borrowed for the lifetime

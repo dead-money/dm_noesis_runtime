@@ -31,7 +31,13 @@ use crate::ffi::{
 /// a `HashMap<String, Vec<u8>>`) and returning a borrow is sufficient.
 ///
 /// [`load_xaml`]: Self::load_xaml
-pub trait XamlProvider: 'static {
+///
+/// `Send + Sync` supertraits let the [`Registered`] guard live inside a
+/// regular Bevy `Resource`; safety rationale identical to
+/// [`crate::render_device::RenderDevice`].
+///
+/// [`Registered`]: Registered
+pub trait XamlProvider: Send + Sync + 'static {
     /// Downcast escape hatch used by [`Registered::provider_mut`]. Standard
     /// one-line body for every impl:
     ///
@@ -96,6 +102,13 @@ pub struct Registered {
     handle: NonNull<c_void>,
     userdata: NonNull<Box<dyn XamlProvider>>,
 }
+
+// SAFETY: matches the rationale on `crate::render_device::Registered` —
+// XamlProvider: Send + Sync, Noesis's per-object call-serialization
+// contract tolerates owner-thread handoffs, and there are no useful
+// `&Registered` methods that touch Noesis state.
+unsafe impl Send for Registered {}
+unsafe impl Sync for Registered {}
 
 impl Registered {
     /// Raw `Noesis::XamlProvider*` — useful for passing to other Noesis APIs

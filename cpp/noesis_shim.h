@@ -195,6 +195,48 @@ void dm_noesis_xaml_provider_destroy(void* provider);
 // Install `provider` as the global XAML provider, or pass NULL to clear.
 void dm_noesis_set_xaml_provider(void* provider);
 
+// ── Font provider (Phase 4.F.1) ────────────────────────────────────────────
+//
+// Subclass of `Noesis::CachedFontProvider`. CachedFontProvider handles font
+// matching (weight/stretch/style) internally once faces are registered; we
+// only need two callbacks:
+//
+//   - `scan_folder(userdata, folder_uri, register_fn, register_cx)` — called
+//     the first time a font is requested from a folder. Rust walks its
+//     registry and invokes `register_fn(register_cx, filename)` once per
+//     font file in that folder. The C++ side forwards each call to
+//     `CachedFontProvider::RegisterFont(folder, filename)`, which opens
+//     the file via `open_font` below to scan face metadata.
+//
+//   - `open_font(userdata, folder_uri, filename, out_data, out_len)` —
+//     return `true` with `*out_data`/`*out_len` set; the pointed bytes
+//     must stay valid until the font-stream reader finishes (same
+//     contract as `load_xaml`). Return `false` to signal "not found".
+
+typedef void (*dm_noesis_register_font_fn)(void* register_cx, const char* filename);
+
+typedef struct dm_noesis_font_provider_vtable {
+    void (*scan_folder)(
+        void* userdata,
+        const char* folder_uri,
+        dm_noesis_register_font_fn register_fn,
+        void* register_cx);
+
+    bool (*open_font)(
+        void* userdata,
+        const char* folder_uri,
+        const char* filename,
+        const uint8_t** out_data,
+        uint32_t* out_len);
+} dm_noesis_font_provider_vtable;
+
+void* dm_noesis_font_provider_create(
+    const dm_noesis_font_provider_vtable* vtable, void* userdata);
+void dm_noesis_font_provider_destroy(void* provider);
+
+// Install `provider` as the global font provider, or pass NULL to clear.
+void dm_noesis_set_font_provider(void* provider);
+
 // ── XAML loading + View + Renderer (Phase 4.C) ─────────────────────────────
 //
 // Opaque pointer contracts:
