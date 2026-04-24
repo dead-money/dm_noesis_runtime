@@ -16,6 +16,7 @@ pub mod ffi;
 pub mod font_provider;
 pub mod gui;
 pub mod render_device;
+pub mod texture_provider;
 pub mod view;
 pub mod xaml_provider;
 

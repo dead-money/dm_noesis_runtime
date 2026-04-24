@@ -69,6 +69,34 @@ pub struct FontProviderVTable {
     ) -> bool,
 }
 
+/// Mirror of `dm_noesis_texture_info` in noesis_shim.h — texture metadata
+/// returned by the provider's `get_info` callback.
+#[repr(C)]
+pub struct TextureInfoFfi {
+    pub width: u32,
+    pub height: u32,
+    pub x: u32,
+    pub y: u32,
+    pub dpi_scale: f32,
+}
+
+#[repr(C)]
+pub struct TextureProviderVTable {
+    pub get_info: unsafe extern "C" fn(
+        userdata: *mut c_void,
+        uri: *const c_char,
+        out: *mut TextureInfoFfi,
+    ) -> bool,
+    pub load_texture: unsafe extern "C" fn(
+        userdata: *mut c_void,
+        uri: *const c_char,
+        out_width: *mut u32,
+        out_height: *mut u32,
+        out_data: *mut *const u8,
+        out_len: *mut u32,
+    ) -> bool,
+}
+
 unsafe extern "C" {
     pub fn dm_noesis_xaml_provider_create(
         vtable: *const XamlProviderVTable,
@@ -90,6 +118,13 @@ unsafe extern "C" {
         stretch: i32,
         style: i32,
     );
+
+    pub fn dm_noesis_texture_provider_create(
+        vtable: *const TextureProviderVTable,
+        userdata: *mut c_void,
+    ) -> *mut c_void;
+    pub fn dm_noesis_texture_provider_destroy(provider: *mut c_void);
+    pub fn dm_noesis_set_texture_provider(provider: *mut c_void);
 
     pub fn dm_noesis_gui_load_xaml(uri: *const c_char) -> *mut c_void;
     pub fn dm_noesis_gui_load_application_resources(uri: *const c_char) -> bool;

@@ -249,6 +249,53 @@ void dm_noesis_set_font_fallbacks(const char* const* families, uint32_t count);
 void dm_noesis_set_font_default_properties(
     float size, int32_t weight, int32_t stretch, int32_t style);
 
+// ── Texture provider (Phase 4.E ImageBrush support) ────────────────────────
+//
+// Subclass of `Noesis::TextureProvider`. Two callbacks:
+//
+//   - `get_info(userdata, uri, out)` — return metadata (width/height and
+//     optional atlas rect + dpi scale) without decoding pixels. Returning
+//     `false` (or an all-zero out) signals "texture not found"; Noesis
+//     falls back to the image-load path below.
+//
+//   - `load_texture(userdata, uri, out_width, out_height, out_data, out_len)`
+//     — return RGBA8-packed pixel bytes plus dimensions. Return `true` on
+//     success; the pointed bytes must stay valid for the duration of the
+//     call. The C++ shim will immediately turn around and call
+//     `device->CreateTexture(...)` with the data, so the ownership lifetime
+//     is exactly the callback — no need to keep the pixels alive beyond.
+//     Return `false` to signal "not found".
+
+typedef struct dm_noesis_texture_info {
+    uint32_t width;
+    uint32_t height;
+    uint32_t x;        // atlas sub-rect x; 0 for a plain image
+    uint32_t y;        // atlas sub-rect y; 0 for a plain image
+    float dpi_scale;   // 1.0 for 96dpi / 1:1
+} dm_noesis_texture_info;
+
+typedef struct dm_noesis_texture_provider_vtable {
+    bool (*get_info)(
+        void* userdata,
+        const char* uri,
+        dm_noesis_texture_info* out);
+
+    bool (*load_texture)(
+        void* userdata,
+        const char* uri,
+        uint32_t* out_width,
+        uint32_t* out_height,
+        const uint8_t** out_data,
+        uint32_t* out_len);
+} dm_noesis_texture_provider_vtable;
+
+void* dm_noesis_texture_provider_create(
+    const dm_noesis_texture_provider_vtable* vtable, void* userdata);
+void dm_noesis_texture_provider_destroy(void* provider);
+
+// Install `provider` as the global texture provider, or pass NULL to clear.
+void dm_noesis_set_texture_provider(void* provider);
+
 // ── XAML loading + View + Renderer (Phase 4.C) ─────────────────────────────
 //
 // Opaque pointer contracts:
