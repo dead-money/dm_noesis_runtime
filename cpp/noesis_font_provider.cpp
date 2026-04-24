@@ -122,3 +122,23 @@ extern "C" void dm_noesis_font_provider_destroy(void* provider) {
 extern "C" void dm_noesis_set_font_provider(void* provider) {
     Noesis::GUI::SetFontProvider(static_cast<Noesis::FontProvider*>(provider));
 }
+
+extern "C" void dm_noesis_set_font_fallbacks(const char* const* families, uint32_t count) {
+    if (!families || count == 0) {
+        Noesis::GUI::SetFontFallbacks(nullptr, 0);
+        return;
+    }
+    // SDK signature takes `const char**`, but the array it reads is const-
+    // correct; cast away the pointer-to-pointer const qualifier.
+    Noesis::GUI::SetFontFallbacks(const_cast<const char**>(families), count);
+}
+
+extern "C" void dm_noesis_set_font_default_properties(
+    float size, int32_t weight, int32_t stretch, int32_t style)
+{
+    Noesis::GUI::SetFontDefaultProperties(
+        size,
+        static_cast<Noesis::FontWeight>(weight),
+        static_cast<Noesis::FontStretch>(stretch),
+        static_cast<Noesis::FontStyle>(style));
+}

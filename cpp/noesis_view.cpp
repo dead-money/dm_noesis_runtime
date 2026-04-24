@@ -23,6 +23,7 @@
 #include <NsGui/IRenderer.h>
 #include <NsGui/IView.h>
 #include <NsGui/MemoryStream.h>
+#include <NsGui/ResourceDictionary.h>
 #include <NsGui/Stream.h>
 #include <NsGui/Uri.h>
 #include <NsGui/XamlProvider.h>
@@ -101,6 +102,15 @@ extern "C" void* dm_noesis_gui_load_xaml(const char* uri) {
 extern "C" void dm_noesis_base_component_release(void* obj) {
     if (!obj) return;
     static_cast<Noesis::BaseComponent*>(obj)->Release();
+}
+
+extern "C" bool dm_noesis_gui_load_application_resources(const char* uri) {
+    if (!uri) return false;
+    Noesis::Ptr<Noesis::ResourceDictionary> dict =
+        Noesis::GUI::LoadXaml<Noesis::ResourceDictionary>(Noesis::Uri(uri));
+    if (!dict) return false;
+    Noesis::GUI::SetApplicationResources(dict);
+    return true;
 }
 
 // ── View lifecycle ─────────────────────────────────────────────────────────

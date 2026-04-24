@@ -237,6 +237,18 @@ void dm_noesis_font_provider_destroy(void* provider);
 // Install `provider` as the global font provider, or pass NULL to clear.
 void dm_noesis_set_font_provider(void* provider);
 
+// `families` is an array of `count` NUL-terminated UTF-8 strings. Each may be
+// a plain family name ("Arial") or a Noesis path-rooted family
+// ("Fonts/#Bitter"). Noesis uses this list to resolve glyphs that are not
+// present in the element's explicit FontFamily.
+void dm_noesis_set_font_fallbacks(const char* const* families, uint32_t count);
+
+// Default font size/weight/stretch/style applied when elements don't
+// specify them. `weight`, `stretch`, `style` mirror `NsGui/InputEnums.h`
+// enums; see their declarations for values.
+void dm_noesis_set_font_default_properties(
+    float size, int32_t weight, int32_t stretch, int32_t style);
+
 // ── XAML loading + View + Renderer (Phase 4.C) ─────────────────────────────
 //
 // Opaque pointer contracts:
@@ -250,6 +262,12 @@ void dm_noesis_set_font_provider(void* provider);
 // Load XAML by URI. Returns a FrameworkElement* (+1 ref), or NULL if the
 // resolved root isn't a FrameworkElement or the URI wasn't found.
 void* dm_noesis_gui_load_xaml(const char* uri);
+
+// Install an application-scope `ResourceDictionary` loaded from `uri`.
+// Replaces any previously-installed application resources. Styles and
+// brushes in the dictionary are visible to every subsequent view.
+// Returns `true` if the URI resolved + parsed as a ResourceDictionary.
+bool dm_noesis_gui_load_application_resources(const char* uri);
 
 // Release a BaseComponent-derived object.
 void dm_noesis_base_component_release(void* obj);

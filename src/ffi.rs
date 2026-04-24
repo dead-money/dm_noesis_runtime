@@ -83,8 +83,16 @@ unsafe extern "C" {
     ) -> *mut c_void;
     pub fn dm_noesis_font_provider_destroy(provider: *mut c_void);
     pub fn dm_noesis_set_font_provider(provider: *mut c_void);
+    pub fn dm_noesis_set_font_fallbacks(families: *const *const c_char, count: u32);
+    pub fn dm_noesis_set_font_default_properties(
+        size: f32,
+        weight: i32,
+        stretch: i32,
+        style: i32,
+    );
 
     pub fn dm_noesis_gui_load_xaml(uri: *const c_char) -> *mut c_void;
+    pub fn dm_noesis_gui_load_application_resources(uri: *const c_char) -> bool;
     pub fn dm_noesis_base_component_release(obj: *mut c_void);
 
     pub fn dm_noesis_view_create(framework_element: *mut c_void) -> *mut c_void;

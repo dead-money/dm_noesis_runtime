@@ -192,3 +192,48 @@ pub fn set_font_provider<P: FontProvider>(provider: P) -> Registered {
         userdata: NonNull::new(userdata).expect("Box::into_raw returned null"),
     }
 }
+
+/// Register the global font fallback chain — each entry is a family name
+/// Noesis will search when an element's explicit `FontFamily` lacks a
+/// requested glyph. Fallbacks can be bare family names (`"Arial"`) or
+/// path-rooted references to a font already known to the font provider
+/// (`"Fonts/#Bitter"`). Also acts as the de-facto *default* font for
+/// elements that don't specify any `FontFamily` at all — Noesis walks the
+/// fallback chain in order.
+///
+/// This is a process-global Noesis setting; call once per run (typically
+/// right after registering the font provider). Passing an empty slice
+/// clears the fallback chain.
+///
+/// # Panics
+///
+/// Panics if any entry contains an interior NUL byte.
+pub fn set_font_fallbacks<S: AsRef<str>>(families: &[S]) {
+    use std::ffi::CString;
+    use std::os::raw::c_char;
+
+    if families.is_empty() {
+        unsafe { crate::ffi::dm_noesis_set_font_fallbacks(core::ptr::null(), 0) };
+        return;
+    }
+
+    let cstrings: Vec<CString> = families
+        .iter()
+        .map(|f| CString::new(f.as_ref()).expect("fallback family contained interior NUL"))
+        .collect();
+    let ptrs: Vec<*const c_char> = cstrings.iter().map(|c| c.as_ptr()).collect();
+    // SAFETY: Noesis copies the names into its own storage; `ptrs` only
+    // needs to be valid for the call's duration.
+    unsafe {
+        crate::ffi::dm_noesis_set_font_fallbacks(ptrs.as_ptr(), ptrs.len() as u32);
+    }
+}
+
+/// Default font properties applied when elements don't set them.
+/// `weight`, `stretch`, `style` mirror the enums in `NsGui/InputEnums.h`;
+/// a WPF-normal default is `(15.0, 400, 5, 0)`.
+pub fn set_font_default_properties(size: f32, weight: i32, stretch: i32, style: i32) {
+    unsafe {
+        crate::ffi::dm_noesis_set_font_default_properties(size, weight, stretch, style);
+    }
+}
