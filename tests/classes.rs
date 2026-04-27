@@ -14,9 +14,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use dm_noesis::classes::{
-    ClassBuilder, Instance, PropertyChangeHandler, PropertyValue,
-};
+use dm_noesis::classes::{ClassBuilder, Instance, PropertyChangeHandler, PropertyValue};
 use dm_noesis::ffi::{ClassBase, PropType};
 use dm_noesis::view::{FrameworkElement, View};
 use dm_noesis::xaml_provider::XamlProvider;
@@ -31,7 +29,9 @@ const SLICER_XAML: &str = r##"<?xml version="1.0" encoding="utf-8"?>
 
 struct InMem(HashMap<String, Vec<u8>>);
 impl XamlProvider for InMem {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
     fn load_xaml(&mut self, uri: &str) -> Option<&[u8]> {
         self.0.get(uri).map(Vec::as_slice)
     }
@@ -54,12 +54,18 @@ struct Handler {
 impl PropertyChangeHandler for Handler {
     fn on_changed(&mut self, _instance: Instance, prop_index: u32, value: PropertyValue<'_>) {
         let v = match value {
-            PropertyValue::Thickness { left, top, right, bottom } => {
-                RecordedValue::Thickness([left, top, right, bottom])
-            }
-            PropertyValue::Rect { x, y, width, height } => {
-                RecordedValue::Rect([x, y, width, height])
-            }
+            PropertyValue::Thickness {
+                left,
+                top,
+                right,
+                bottom,
+            } => RecordedValue::Thickness([left, top, right, bottom]),
+            PropertyValue::Rect {
+                x,
+                y,
+                width,
+                height,
+            } => RecordedValue::Rect([x, y, width, height]),
             _ => RecordedValue::Other,
         };
         self.recorder.inner.lock().unwrap().push((prop_index, v));
@@ -84,7 +90,9 @@ fn class_registration_roundtrip() {
         let mut builder = ClassBuilder::new(
             "Sample.NineSlicer",
             ClassBase::ContentControl,
-            Handler { recorder: recorder.clone() },
+            Handler {
+                recorder: recorder.clone(),
+            },
         );
         let source_idx = builder.add_property("Source", PropType::ImageSource);
         let thickness_idx = builder.add_property("SliceThickness", PropType::Thickness);
@@ -103,8 +111,8 @@ fn class_registration_roundtrip() {
         bytes.insert("scene.xaml".to_string(), SLICER_XAML.as_bytes().to_vec());
         let _provider_guard = dm_noesis::xaml_provider::set_xaml_provider(InMem(bytes));
 
-        let element = FrameworkElement::load("scene.xaml")
-            .expect("load_xaml returned None for scene.xaml");
+        let element =
+            FrameworkElement::load("scene.xaml").expect("load_xaml returned None for scene.xaml");
 
         let mut view = View::create(element);
         view.set_size(200, 200);
@@ -133,8 +141,7 @@ fn class_registration_roundtrip() {
 
         // Round-trip a Rect via the public API. The slicer instance is the
         // raw FrameworkElement pointer; cast through Instance::from_raw.
-        let instance =
-            unsafe { Instance::from_raw(std::ptr::NonNull::new(slicer.raw()).unwrap()) };
+        let instance = unsafe { Instance::from_raw(std::ptr::NonNull::new(slicer.raw()).unwrap()) };
         instance.set_rect(viewbox_idx, 1.0, 2.0, 3.0, 4.0);
         let read = instance
             .get_rect(viewbox_idx)
@@ -146,7 +153,11 @@ fn class_registration_roundtrip() {
             *i == viewbox_idx
                 && matches!(v, RecordedValue::Rect(arr) if *arr == [1.0, 2.0, 3.0, 4.0])
         });
-        assert!(saw_rect, "expected Rect change from set_rect; got {:?}", recorded2);
+        assert!(
+            saw_rect,
+            "expected Rect change from set_rect; got {:?}",
+            recorded2
+        );
 
         // Drop instance handles before the view, then drop the view, then
         // drop the registration. Registration must outlive every instance.

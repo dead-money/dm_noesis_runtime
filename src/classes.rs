@@ -45,8 +45,8 @@ use std::sync::Mutex;
 
 use crate::ffi::{
     ClassBase, PropType, dm_noesis_class_register, dm_noesis_class_register_property,
-    dm_noesis_class_unregister, dm_noesis_image_source_get_size,
-    dm_noesis_instance_get_property, dm_noesis_instance_set_property,
+    dm_noesis_class_unregister, dm_noesis_image_source_get_size, dm_noesis_instance_get_property,
+    dm_noesis_instance_set_property,
 };
 
 /// Read width / height of an `ImageSource` value (or any `BaseComponent*`
@@ -90,9 +90,24 @@ pub enum PropertyValue<'a> {
     Double(f64),
     Bool(bool),
     String(Option<&'a str>),
-    Thickness { left: f32, top: f32, right: f32, bottom: f32 },
-    Color { r: f32, g: f32, b: f32, a: f32 },
-    Rect { x: f32, y: f32, width: f32, height: f32 },
+    Thickness {
+        left: f32,
+        top: f32,
+        right: f32,
+        bottom: f32,
+    },
+    Color {
+        r: f32,
+        g: f32,
+        b: f32,
+        a: f32,
+    },
+    Rect {
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+    },
     /// Borrowed `Noesis::ImageSource*` (or null). Treat as opaque.
     ImageSource(Option<NonNull<c_void>>),
     /// Borrowed `Noesis::BaseComponent*` (or null). Treat as opaque.
@@ -163,7 +178,12 @@ impl<H: PropertyChangeHandler> ClassBuilder<H> {
     /// the registration (most commonly: name already registered, or a
     /// property had a type the v1 FFI doesn't yet support).
     pub fn register(self) -> Option<ClassRegistration> {
-        let ClassBuilder { name, base, handler, props } = self;
+        let ClassBuilder {
+            name,
+            base,
+            handler,
+            props,
+        } = self;
         let prop_types: Vec<PropType> = props.iter().map(|(_, k, _)| *k).collect();
 
         // Box twice so we have a stable thin pointer for the C ABI userdata,
@@ -228,9 +248,24 @@ pub enum PropertyDefault<'a> {
     Double(f64),
     Bool(bool),
     String(&'a str),
-    Thickness { left: f32, top: f32, right: f32, bottom: f32 },
-    Color { r: f32, g: f32, b: f32, a: f32 },
-    Rect { x: f32, y: f32, width: f32, height: f32 },
+    Thickness {
+        left: f32,
+        top: f32,
+        right: f32,
+        bottom: f32,
+    },
+    Color {
+        r: f32,
+        g: f32,
+        b: f32,
+        a: f32,
+    },
+    Rect {
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+    },
 }
 
 impl PropertyDefault<'_> {
@@ -245,13 +280,19 @@ impl PropertyDefault<'_> {
                 let c = CString::new(s).ok();
                 OwnedDefault::String(c)
             }
-            PropertyDefault::Thickness { left, top, right, bottom } => {
-                OwnedDefault::Thickness([left, top, right, bottom])
-            }
+            PropertyDefault::Thickness {
+                left,
+                top,
+                right,
+                bottom,
+            } => OwnedDefault::Thickness([left, top, right, bottom]),
             PropertyDefault::Color { r, g, b, a } => OwnedDefault::Color([r, g, b, a]),
-            PropertyDefault::Rect { x, y, width, height } => {
-                OwnedDefault::Rect([x, y, width, height])
-            }
+            PropertyDefault::Rect {
+                x,
+                y,
+                width,
+                height,
+            } => OwnedDefault::Rect([x, y, width, height]),
         }
     }
 }
@@ -286,9 +327,9 @@ impl OwnedDefault {
                 }
                 None => ptr::null(),
             },
-            OwnedDefault::Thickness(arr)
-            | OwnedDefault::Color(arr)
-            | OwnedDefault::Rect(arr) => arr.as_ptr().cast(),
+            OwnedDefault::Thickness(arr) | OwnedDefault::Color(arr) | OwnedDefault::Rect(arr) => {
+                arr.as_ptr().cast()
+            }
         }
     }
 }
@@ -410,31 +451,19 @@ impl Instance {
     pub fn set_thickness(self, prop_index: u32, left: f32, top: f32, right: f32, bottom: f32) {
         let arr = [left, top, right, bottom];
         unsafe {
-            dm_noesis_instance_set_property(
-                self.0.as_ptr(),
-                prop_index,
-                arr.as_ptr().cast(),
-            );
+            dm_noesis_instance_set_property(self.0.as_ptr(), prop_index, arr.as_ptr().cast());
         }
     }
     pub fn set_color(self, prop_index: u32, r: f32, g: f32, b: f32, a: f32) {
         let arr = [r, g, b, a];
         unsafe {
-            dm_noesis_instance_set_property(
-                self.0.as_ptr(),
-                prop_index,
-                arr.as_ptr().cast(),
-            );
+            dm_noesis_instance_set_property(self.0.as_ptr(), prop_index, arr.as_ptr().cast());
         }
     }
     pub fn set_rect(self, prop_index: u32, x: f32, y: f32, width: f32, height: f32) {
         let arr = [x, y, width, height];
         unsafe {
-            dm_noesis_instance_set_property(
-                self.0.as_ptr(),
-                prop_index,
-                arr.as_ptr().cast(),
-            );
+            dm_noesis_instance_set_property(self.0.as_ptr(), prop_index, arr.as_ptr().cast());
         }
     }
 
@@ -465,22 +494,14 @@ impl Instance {
     pub fn get_thickness(self, prop_index: u32) -> Option<(f32, f32, f32, f32)> {
         let mut out = [0.0f32; 4];
         let ok = unsafe {
-            dm_noesis_instance_get_property(
-                self.0.as_ptr(),
-                prop_index,
-                out.as_mut_ptr().cast(),
-            )
+            dm_noesis_instance_get_property(self.0.as_ptr(), prop_index, out.as_mut_ptr().cast())
         };
         ok.then_some((out[0], out[1], out[2], out[3]))
     }
     pub fn get_rect(self, prop_index: u32) -> Option<(f32, f32, f32, f32)> {
         let mut out = [0.0f32; 4];
         let ok = unsafe {
-            dm_noesis_instance_get_property(
-                self.0.as_ptr(),
-                prop_index,
-                out.as_mut_ptr().cast(),
-            )
+            dm_noesis_instance_get_property(self.0.as_ptr(), prop_index, out.as_mut_ptr().cast())
         };
         ok.then_some((out[0], out[1], out[2], out[3]))
     }
@@ -495,11 +516,7 @@ impl Instance {
     pub fn get_image_source_size(self, prop_index: u32) -> Option<(f32, f32)> {
         let mut raw_ptr: *mut c_void = ptr::null_mut();
         let ok = unsafe {
-            dm_noesis_instance_get_property(
-                self.0.as_ptr(),
-                prop_index,
-                (&raw mut raw_ptr).cast(),
-            )
+            dm_noesis_instance_get_property(self.0.as_ptr(), prop_index, (&raw mut raw_ptr).cast())
         };
         if !ok {
             return None;
@@ -524,7 +541,9 @@ unsafe extern "C" fn prop_changed_trampoline(
     value_ptr: *const c_void,
 ) {
     let handler = &mut *userdata.cast::<Box<dyn PropertyChangeHandler>>();
-    let Some(instance) = NonNull::new(instance) else { return };
+    let Some(instance) = NonNull::new(instance) else {
+        return;
+    };
 
     // We need the prop type to decode the value. The C++ side knows the type
     // tag for the prop but doesn't pass it across the FFI on the changed
@@ -587,11 +606,22 @@ unsafe fn decode_value<'a>(
             PropType::Double => PropertyValue::Double(0.0),
             PropType::Bool => PropertyValue::Bool(false),
             PropType::Thickness => PropertyValue::Thickness {
-                left: 0.0, top: 0.0, right: 0.0, bottom: 0.0,
+                left: 0.0,
+                top: 0.0,
+                right: 0.0,
+                bottom: 0.0,
             },
-            PropType::Color => PropertyValue::Color { r: 0.0, g: 0.0, b: 0.0, a: 0.0 },
+            PropType::Color => PropertyValue::Color {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 0.0,
+            },
             PropType::Rect => PropertyValue::Rect {
-                x: 0.0, y: 0.0, width: 0.0, height: 0.0,
+                x: 0.0,
+                y: 0.0,
+                width: 0.0,
+                height: 0.0,
             },
         };
     }
@@ -622,13 +652,19 @@ unsafe fn decode_value<'a>(
         PropType::Color => {
             let f = value_ptr.cast::<f32>();
             PropertyValue::Color {
-                r: *f, g: *f.add(1), b: *f.add(2), a: *f.add(3),
+                r: *f,
+                g: *f.add(1),
+                b: *f.add(2),
+                a: *f.add(3),
             }
         }
         PropType::Rect => {
             let f = value_ptr.cast::<f32>();
             PropertyValue::Rect {
-                x: *f, y: *f.add(1), width: *f.add(2), height: *f.add(3),
+                x: *f,
+                y: *f.add(1),
+                width: *f.add(2),
+                height: *f.add(3),
             }
         }
         PropType::ImageSource => {
@@ -641,4 +677,3 @@ unsafe fn decode_value<'a>(
         }
     }
 }
-
