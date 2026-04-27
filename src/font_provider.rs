@@ -159,6 +159,43 @@ impl Registered {
             .downcast_mut::<F>()
             .expect("Registered::provider_mut: type does not match set_font_provider")
     }
+
+    /// Eagerly register a `(folder_uri, filename)` face with the
+    /// underlying `CachedFontProvider` cache, bypassing Noesis's lazy
+    /// `ScanFolder` model. Once registered, any later
+    /// `FontFamily="folder_uri/#Family"` lookup whose face metadata
+    /// matches will resolve through this provider's
+    /// [`FontProvider::open_font`] callback — even if the cache has
+    /// already been scanned.
+    ///
+    /// Calling this for a `(folder_uri, filename)` already registered is
+    /// safe: Noesis re-opens the stream and re-scans face metadata; the
+    /// duplicate face is ignored. Callers are responsible for any
+    /// deduplication if the open + scan cost matters.
+    ///
+    /// The bytes returned by `open_font` for `(folder_uri, filename)`
+    /// must remain valid for the duration of this call (Noesis reads
+    /// face metadata synchronously inside the FFI).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `folder_uri` or `filename` contain interior NUL bytes.
+    pub fn register_font(&self, folder_uri: &str, filename: &str) {
+        use std::ffi::CString;
+        let folder = CString::new(folder_uri).expect("folder_uri contained interior NUL");
+        let name = CString::new(filename).expect("filename contained interior NUL");
+        // SAFETY: `self.handle` was returned by
+        // `dm_noesis_font_provider_create` and points at a `RustFontProvider`
+        // that's live for the lifetime of `self`. The two CStrings outlive
+        // the synchronous FFI call.
+        unsafe {
+            crate::ffi::dm_noesis_font_provider_register_font(
+                self.handle.as_ptr(),
+                folder.as_ptr(),
+                name.as_ptr(),
+            );
+        }
+    }
 }
 
 impl Drop for Registered {
