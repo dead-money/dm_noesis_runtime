@@ -424,6 +424,148 @@ void* dm_noesis_subscribe_click(
 // Unsubscribe and free the handler. Safe to call with NULL.
 void dm_noesis_unsubscribe_click(void* token);
 
+// ── Custom XAML class registration (Phase 5.C) ─────────────────────────────
+//
+// Register Rust-backed types so XAML can instantiate them by name (`<aor:Foo>`)
+// and bind their dependency properties. This is the C++/Rust analogue of
+// what Noesis's C# / Unity binding does for managed code: a per-base-type
+// trampoline subclass + a runtime-built `TypeClassBuilder` per consumer-named
+// type + Factory creator + UIElementData with the consumer's DPs.
+//
+// Usage flow (Rust side):
+//   1. dm_noesis_class_register("AOR.NineSlicer", DM_NOESIS_BASE_CONTENT_CONTROL,
+//      cb, userdata) → class_token.
+//   2. dm_noesis_class_register_property(token, "Source",
+//      DM_NOESIS_PROP_BASE_COMPONENT, NULL) → prop_index.
+//      ...repeat for each DP. Indices are dense (0, 1, 2, ...) in registration
+//      order and identify the DP in the changed callback.
+//   3. Load XAML that uses `<aor:NineSlicer Source="..." />`.
+//      Noesis instantiates a trampoline; every property write fires `cb` with
+//      `(userdata, instance, prop_index, value_ptr)`.
+//   4. From Rust, dm_noesis_instance_set_property(instance, idx, value_ptr)
+//      writes back computed values; dm_noesis_instance_get_property reads.
+//   5. dm_noesis_class_unregister(token) at process shutdown, after all
+//      instances are released.
+//
+// Registration must complete BEFORE the first XAML referencing the class
+// loads. Unregistration must happen AFTER the last instance is released
+// (typically: just before dm_noesis_shutdown).
+
+typedef enum dm_noesis_class_base {
+    DM_NOESIS_BASE_CONTENT_CONTROL = 0,
+    // Future bases (Control, UserControl, FrameworkElement, Panel) plug in
+    // by adding sibling trampoline subclasses in noesis_classes.cpp.
+} dm_noesis_class_base;
+
+// Property value-type tag. Determines the layout of `value_ptr` /
+// `default_ptr` / `out_value` buffers in the FFI:
+//
+//   INT32         → const int32_t*
+//   FLOAT         → const float*
+//   DOUBLE        → const double*
+//   BOOL          → const bool* (one byte; nonzero = true)
+//   STRING        → const char* const* (pointer to a NUL-terminated UTF-8 string;
+//                   on `set` the bytes are copied; on `get`/changed callback the
+//                   pointer borrows from Noesis-owned storage and must not be
+//                   freed; copy if you need to keep it past the next layout pass)
+//   THICKNESS     → const float[4]: left, top, right, bottom (matches
+//                   Noesis::Thickness layout)
+//   COLOR         → const float[4]: r, g, b, a (matches Noesis::Color layout)
+//   RECT          → const float[4]: x, y, width, height (matches Noesis::Rect)
+//   IMAGE_SOURCE  → BaseComponent* (a Noesis::ImageSource subclass; ownership
+//                   convention matches dm_noesis_base_component_release — the
+//                   `set` path does NOT consume the caller's ref; the `get`
+//                   / changed callback yields a borrowed pointer)
+//   BASE_COMPONENT → BaseComponent* (any Noesis::BaseComponent subclass; same
+//                    ownership convention as IMAGE_SOURCE)
+typedef enum dm_noesis_prop_type {
+    DM_NOESIS_PROP_INT32          = 0,
+    DM_NOESIS_PROP_FLOAT          = 1,
+    DM_NOESIS_PROP_DOUBLE         = 2,
+    DM_NOESIS_PROP_BOOL           = 3,
+    DM_NOESIS_PROP_STRING         = 4,
+    DM_NOESIS_PROP_THICKNESS      = 5,
+    DM_NOESIS_PROP_COLOR          = 6,
+    DM_NOESIS_PROP_RECT           = 7,
+    DM_NOESIS_PROP_IMAGE_SOURCE   = 8,
+    DM_NOESIS_PROP_BASE_COMPONENT = 9
+} dm_noesis_prop_type;
+
+// Callback fired by the trampoline subclass's `OnPropertyChanged` override.
+// `instance` is the C++ object pointer (an opaque BaseComponent*), useful as
+// a stable per-instance identity for the Rust side; `prop_index` is the dense
+// index returned from dm_noesis_class_register_property; `value_ptr` is the
+// new value in the layout determined by the property's registered type.
+//
+// The callback fires from inside Noesis's property pump — typically the main
+// thread during XAML parse + layout + input. Keep work small; queue if heavy.
+typedef void (*dm_noesis_prop_changed_fn)(
+    void* userdata,
+    void* instance,
+    uint32_t prop_index,
+    const void* value_ptr);
+
+// Register a Rust-backed class. Returns an opaque token to use for property
+// registration + unregistration. NULL on bad input (null name, unsupported
+// base, init not yet called, name already registered).
+void* dm_noesis_class_register(
+    const char* name,
+    dm_noesis_class_base base,
+    dm_noesis_prop_changed_fn cb,
+    void* userdata);
+
+// Add a DependencyProperty to a registered class. `default_ptr` follows the
+// per-type layout above (or NULL for a type-default zero/empty). Returns the
+// dense property index, or UINT32_MAX on failure (null token, unknown type,
+// duplicate property name on the same class).
+//
+// All properties must be registered BEFORE the first XAML referencing the
+// class loads — Noesis caches the property set on the TypeClass.
+uint32_t dm_noesis_class_register_property(
+    void* class_token,
+    const char* prop_name,
+    dm_noesis_prop_type prop_type,
+    const void* default_ptr);
+
+// Unregister a class: removes from Factory + Reflection registries and frees
+// the synthetic TypeClass. Safe to call with NULL. Must be called AFTER all
+// instances of the class are released (typically at process shutdown).
+void dm_noesis_class_unregister(void* class_token);
+
+// Set a property on an instance. `instance` is the BaseComponent* delivered
+// to the changed callback; `prop_index` is the dense index from registration;
+// `value_ptr` follows the per-type layout. Setting fires the changed callback
+// recursively if the new value differs from the current — the Rust side is
+// responsible for any re-entrancy guard.
+void dm_noesis_instance_set_property(
+    void* instance,
+    uint32_t prop_index,
+    const void* value_ptr);
+
+// Read a property from an instance. `out_value` must point to a buffer of the
+// appropriate size for the property type (4 bytes for INT32/FLOAT/BOOL,
+// 8 for DOUBLE, 16 for THICKNESS/COLOR/RECT, sizeof(void*) for STRING /
+// IMAGE_SOURCE / BASE_COMPONENT). For STRING/component types the buffer
+// receives a borrowed pointer (do not free). Returns true on success, false
+// on bad input (null pointers, index out of range, type mismatch).
+bool dm_noesis_instance_get_property(
+    void* instance,
+    uint32_t prop_index,
+    void* out_value);
+
+// Read width / height of a Noesis::ImageSource (or a subclass). Returns
+// `false` and leaves the out-params untouched if `image_source` is null or
+// not an ImageSource. Useful for custom controls (NineSlicer / ThreeSlicer)
+// that need to compute viewboxes from the source dimensions.
+//
+// The pointer convention matches what the property-changed callback hands
+// out for `IMAGE_SOURCE` properties: a borrowed `BaseComponent*` whose
+// runtime type is an ImageSource subclass. Caller does not own a ref.
+bool dm_noesis_image_source_get_size(
+    void* image_source,
+    float* out_width,
+    float* out_height);
+
 #ifdef __cplusplus
 }
 #endif
