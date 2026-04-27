@@ -134,8 +134,8 @@ let _registration = MarkupExtensionRegistration::from_closure(
 ## Setup
 
 ```sh
-unzip ~/Downloads/NoesisGUI-NativeSDK-linux-3.2.12-Indie.zip -d ~/deadmoney/sdk/noesis-3.2.12
-export NOESIS_SDK_DIR=~/deadmoney/sdk/noesis-3.2.12
+unzip NoesisGUI-NativeSDK-linux-3.2.12-Indie.zip -d ~/sdks/noesis-3.2.12
+export NOESIS_SDK_DIR=~/sdks/noesis-3.2.12
 cargo test
 ```
 
@@ -173,9 +173,9 @@ For maintainers — what lives where in the tree.
 
 ## Licensing
 
-Rust source in this repository is © 2026 Dead Money, all rights reserved.
+Source in this repository is © 2026 Dead Money, distributed under the [MIT License](./LICENSE). Every file under `cpp/`, `src/`, `tests/`, and `docs/` is original work — no Noesis SDK code is vendored or translated, only `#include`'d at compile time from `NOESIS_SDK_DIR`.
 
-The Noesis Native SDK is **not redistributed** here. You must obtain it from Noesis Technologies under their EULA and extract it yourself; `build.rs` reads it from `NOESIS_SDK_DIR` at compile time and links `libNoesis.{so,dll,dylib}` from `Bin/<platform>/`. Per-developer license, no checked-in binaries.
+The Noesis Native SDK itself is **not redistributed** here. You must obtain it from Noesis Technologies under their own EULA; `build.rs` reads it from `NOESIS_SDK_DIR` at compile time and links `libNoesis.{so,dll,dylib}` from `Bin/<platform>/`. Use, distribution, and licensing of binaries you build that link against the SDK are governed by the Noesis EULA, not by the MIT License above.
 
 ## Acknowledgements
 

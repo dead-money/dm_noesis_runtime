@@ -14,10 +14,9 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 # fmt is the only build-step we can run on a hosted runner: cargo
-# build / clippy / test all need the proprietary Noesis Native SDK
-# (see README.md "Setup"), which can't be redistributed and so isn't
-# available here. Add a clippy + test job behind a self-hosted runner
-# with NOESIS_SDK_DIR populated when one's available.
+# build / clippy / test all need the Noesis Native SDK (see README's
+# "Setup" section), which is closed-source and not available on
+# GitHub-hosted runners.
 jobs:
   fmt:
     name: fmt
