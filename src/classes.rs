@@ -534,6 +534,16 @@ impl Instance {
         };
         ok.then_some((out[0], out[1], out[2], out[3]))
     }
+    /// Read back a `Color` DP as `(r, g, b, a)` floats in 0..=1. Returns
+    /// `None` on bad input (instance pointer / index mismatch / type
+    /// mismatch).
+    pub fn get_color(self, prop_index: u32) -> Option<(f32, f32, f32, f32)> {
+        let mut out = [0.0f32; 4];
+        let ok = unsafe {
+            dm_noesis_instance_get_property(self.0.as_ptr(), prop_index, out.as_mut_ptr().cast())
+        };
+        ok.then_some((out[0], out[1], out[2], out[3]))
+    }
 
     /// Read the intrinsic size of an `ImageSource`-typed property's current
     /// value. Returns `None` when the source is null, not an
