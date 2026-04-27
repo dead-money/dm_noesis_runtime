@@ -177,9 +177,77 @@ unsafe extern "C" {
         userdata: *mut c_void,
     ) -> *mut c_void;
     pub fn dm_noesis_unsubscribe_click(token: *mut c_void);
+
+    pub fn dm_noesis_class_register(
+        name: *const c_char,
+        base: ClassBase,
+        cb: PropChangedFn,
+        userdata: *mut c_void,
+    ) -> *mut c_void;
+    pub fn dm_noesis_class_register_property(
+        class_token: *mut c_void,
+        prop_name: *const c_char,
+        prop_type: PropType,
+        default_ptr: *const c_void,
+    ) -> u32;
+    pub fn dm_noesis_class_unregister(class_token: *mut c_void);
+    pub fn dm_noesis_instance_set_property(
+        instance: *mut c_void,
+        prop_index: u32,
+        value_ptr: *const c_void,
+    );
+    pub fn dm_noesis_instance_get_property(
+        instance: *mut c_void,
+        prop_index: u32,
+        out_value: *mut c_void,
+    ) -> bool;
 }
 
 /// C callback invoked when a subscribed `BaseButton::Click` fires. See
 /// `cpp/noesis_shim.h` for the threading contract — the callback runs on
 /// whatever thread is driving the view, so keep work small.
 pub type ClickFn = unsafe extern "C" fn(userdata: *mut c_void);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Custom XAML class registration (Phase 5.C). See cpp/noesis_shim.h for the
+// per-type value layout convention each variant of `PropType` enforces.
+// ────────────────────────────────────────────────────────────────────────────
+
+/// Base type the trampoline subclass derives from. v1 only exposes
+/// `ContentControl`; sibling base types (Control, UserControl,
+/// FrameworkElement, Panel) plug in by adding trampoline subclasses on the
+/// C++ side and a new variant here.
+#[repr(u32)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ClassBase {
+    ContentControl = 0,
+}
+
+/// FFI value-type tag. The buffer layout for `value_ptr` / `default_ptr` /
+/// `out_value` is determined by this tag — see the per-variant comments in
+/// `cpp/noesis_shim.h` for exact byte conventions.
+#[repr(u32)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum PropType {
+    Int32 = 0,
+    Float = 1,
+    Double = 2,
+    Bool = 3,
+    String = 4,
+    Thickness = 5,
+    Color = 6,
+    Rect = 7,
+    ImageSource = 8,
+    BaseComponent = 9,
+}
+
+/// Property-changed callback. Fired from inside Noesis's property pump
+/// (typically the main thread during XAML parse + layout + input). `instance`
+/// is the C++ object pointer (stable for the instance's lifetime); see
+/// `cpp/noesis_shim.h` for the per-`PropType` layout of `value_ptr`.
+pub type PropChangedFn = unsafe extern "C" fn(
+    userdata: *mut c_void,
+    instance: *mut c_void,
+    prop_index: u32,
+    value_ptr: *const c_void,
+);
