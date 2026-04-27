@@ -31,23 +31,64 @@
 #include <NsGui/MarkupExtension.h>
 #include <NsGui/ValueTargetProvider.h>
 
+#include <atomic>
 #include <mutex>
 #include <unordered_map>
+#include <vector>
 
 namespace {
 
 // ── ClassData + registry ───────────────────────────────────────────────────
 
+// Same intrusive-refcount model as ClassData in noesis_classes.cpp — see
+// the comment there for the full lifetime contract. Short version: each
+// live `RustMarkupExtension` instance bumps the count; the Rust caller's
+// `MarkupExtensionRegistration` holds the +1 created at register time;
+// final free runs the `free_handler` Rust trampoline.
 struct MarkupClassData {
     Noesis::String                 name;
     Noesis::Symbol                 sym;
     Noesis::TypeClassBuilder*      typeClass; // owned by Reflection registry
     dm_noesis_markup_provide_fn    cb;
     void*                          userdata;
+    dm_noesis_markup_free_fn       free_handler;
+    std::atomic<int>               ref_count;
+
+    MarkupClassData(): ref_count(1) {}
+
+    void AddRef() noexcept {
+        ref_count.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    void Release() {
+        if (ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+            std::atomic_thread_fence(std::memory_order_acquire);
+            // See ClassData::Release in noesis_classes.cpp — same
+            // rationale: never delete typeClass or `this` from inside
+            // the destructor chain. Just free the Rust handler box;
+            // the rest leaks until process shutdown sweeps it.
+            void* ud = userdata;
+            userdata = nullptr;
+            if (free_handler && ud) {
+                free_handler(ud);
+            }
+        }
+    }
 };
 
 std::mutex                                              g_markup_registry_mutex;
 std::unordered_map<uint32_t, MarkupClassData*>          g_markup_registry;
+
+// Same shape as g_pending_class_data in noesis_classes.cpp — see the
+// comment there. Walked at process shutdown to defensively free any
+// handler boxes that survived normal teardown.
+std::mutex                                              g_pending_markup_mutex;
+std::vector<MarkupClassData*>                           g_pending_markup_data;
+
+void register_pending_markup(MarkupClassData* cd) {
+    std::lock_guard<std::mutex> lock(g_pending_markup_mutex);
+    g_pending_markup_data.push_back(cd);
+}
 
 MarkupClassData* markup_registry_find(Noesis::Symbol sym) {
     std::lock_guard<std::mutex> lock(g_markup_registry_mutex);
@@ -79,7 +120,18 @@ public:
 
     RustMarkupExtension() = default;
 
-    void BindClassData(MarkupClassData* cd) { mClassData = cd; }
+    ~RustMarkupExtension() {
+        if (mClassData) {
+            mClassData->Release();
+            mClassData = nullptr;
+        }
+    }
+
+    void BindClassData(MarkupClassData* cd) {
+        if (mClassData) mClassData->Release();
+        mClassData = cd;
+        if (cd) cd->AddRef();
+    }
     MarkupClassData* GetClassData() const { return mClassData; }
 
     Noesis::Ptr<Noesis::BaseComponent>
@@ -175,7 +227,8 @@ Noesis::BaseComponent* markup_creator(Noesis::Symbol name) {
 extern "C" void* dm_noesis_markup_extension_register(
     const char* name,
     dm_noesis_markup_provide_fn cb,
-    void* userdata) {
+    void* userdata,
+    dm_noesis_markup_free_fn free_handler) {
     if (!name || !cb) return nullptr;
 
     Noesis::Symbol sym = Noesis::Symbol(name);
@@ -188,6 +241,7 @@ extern "C" void* dm_noesis_markup_extension_register(
     cd->sym = sym;
     cd->cb = cb;
     cd->userdata = userdata;
+    cd->free_handler = free_handler;
 
     cd->typeClass = new Noesis::TypeClassBuilder(sym, /*isInterface*/ false);
     cd->typeClass->AddBase(Noesis::TypeOf<RustMarkupExtension>());
@@ -195,10 +249,13 @@ extern "C" void* dm_noesis_markup_extension_register(
     Noesis::Reflection::RegisterType(cd->typeClass);
     Noesis::Factory::RegisterComponent(sym, Noesis::Symbol(""), markup_creator);
 
+    register_pending_markup(cd);
+
     if (!markup_registry_insert(sym, cd)) {
         Noesis::Factory::UnregisterComponent(sym);
         Noesis::Reflection::Unregister(cd->typeClass);
-        delete cd;
+        // Use Release so the free_handler runs even on this failure path.
+        cd->Release();
         return nullptr;
     }
 
@@ -209,9 +266,32 @@ extern "C" void dm_noesis_markup_extension_unregister(void* token) {
     if (!token) return;
     auto* cd = static_cast<MarkupClassData*>(token);
 
+    // Stop new instances; existing live instances retain their own refs.
+    // Reflection::Unregister is deliberately NOT called — Noesis::Shutdown
+    // tears down the registry on its own and walking it manually mid-
+    // process trips on instance destructor chains. See noesis_classes.cpp.
     Noesis::Factory::UnregisterComponent(cd->sym);
     markup_registry_erase(cd->sym);
-    Noesis::Reflection::Unregister(cd->typeClass);
 
-    delete cd;
+    // Drop the Rust caller's ref. The Rust handler box is freed here if
+    // no extension instances are alive, or deferred to the last instance
+    // dying (RustMarkupExtension's destructor).
+    cd->Release();
+}
+
+// Process-shutdown sweep — see noesis_classes.cpp's
+// `dm_noesis_classes_force_free_at_shutdown` for the rationale.
+extern "C" void dm_noesis_markup_extensions_force_free_at_shutdown(void) {
+    std::vector<MarkupClassData*> pending;
+    {
+        std::lock_guard<std::mutex> lock(g_pending_markup_mutex);
+        pending = std::move(g_pending_markup_data);
+    }
+    for (MarkupClassData* cd : pending) {
+        void* ud = cd->userdata;
+        cd->userdata = nullptr;
+        if (cd->free_handler && ud) {
+            cd->free_handler(ud);
+        }
+    }
 }

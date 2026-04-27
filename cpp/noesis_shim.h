@@ -512,14 +512,28 @@ typedef void (*dm_noesis_prop_changed_fn)(
     uint32_t prop_index,
     const void* value_ptr);
 
+// Free callback invoked when the underlying ClassData is finally torn down —
+// either immediately at `dm_noesis_class_unregister` (if no instances exist)
+// or deferred until the last live instance is released. Receives the
+// `userdata` passed to `dm_noesis_class_register` so the Rust trampoline can
+// drop its boxed handler. Called exactly once per successfully-registered
+// class.
+typedef void (*dm_noesis_class_free_fn)(void* userdata);
+
 // Register a Rust-backed class. Returns an opaque token to use for property
 // registration + unregistration. NULL on bad input (null name, unsupported
 // base, init not yet called, name already registered).
+//
+// `free_handler` (optional, may be NULL) is invoked exactly once when
+// ClassData is finally freed — see `dm_noesis_class_free_fn`. Ownership of
+// `userdata` transfers to the C++ side at registration; the Rust side must
+// not free it.
 void* dm_noesis_class_register(
     const char* name,
     dm_noesis_class_base base,
     dm_noesis_prop_changed_fn cb,
-    void* userdata);
+    void* userdata,
+    dm_noesis_class_free_fn free_handler);
 
 // Add a DependencyProperty to a registered class. `default_ptr` follows the
 // per-type layout above (or NULL for a type-default zero/empty). Returns the
@@ -534,9 +548,12 @@ uint32_t dm_noesis_class_register_property(
     dm_noesis_prop_type prop_type,
     const void* default_ptr);
 
-// Unregister a class: removes from Factory + Reflection registries and frees
-// the synthetic TypeClass. Safe to call with NULL. Must be called AFTER all
-// instances of the class are released (typically at process shutdown).
+// Unregister a class: removes from Factory + Reflection so no NEW instances
+// can be created, then releases the Rust caller's reference on the
+// underlying ClassData. Existing live instances retain their own references
+// — the actual free + `free_handler` callback runs when the last instance
+// is destroyed (which may be later than this call, e.g. when a View
+// holding the instances is finally torn down). Safe to call with NULL.
 void dm_noesis_class_unregister(void* class_token);
 
 // Set a property on an instance. `instance` is the BaseComponent* delivered
@@ -629,16 +646,29 @@ typedef bool (*dm_noesis_markup_provide_fn)(
     const char** out_string,
     void** out_component);
 
+// Free callback invoked exactly once when the underlying MarkupClassData
+// is finally torn down — either at unregister (no instances alive) or
+// deferred to the last live extension instance's destruction. Mirrors
+// `dm_noesis_class_free_fn`. Ownership of `userdata` transfers to the
+// C++ side at registration; the Rust side must not free it.
+typedef void (*dm_noesis_markup_free_fn)(void* userdata);
+
 // Register a Rust-backed MarkupExtension class. NULL on bad input
 // (null name, init not yet called, name already registered).
+//
+// `free_handler` (optional, may be NULL) is invoked exactly once when
+// MarkupClassData is finally freed.
 void* dm_noesis_markup_extension_register(
     const char* name,
     dm_noesis_markup_provide_fn cb,
-    void* userdata);
+    void* userdata,
+    dm_noesis_markup_free_fn free_handler);
 
-// Unregister a markup extension class. Safe to call with NULL. Must
-// happen AFTER the last XAML using the extension has been parsed and
-// any outstanding extension instances released — typically at shutdown.
+// Unregister a markup extension class — removes from Factory + Reflection
+// so no NEW instances can be created, then drops the Rust caller's ref
+// on MarkupClassData. Existing live extension instances retain their
+// references; the actual free + `free_handler` callback runs when the
+// last instance is destroyed. Safe to call with NULL.
 void dm_noesis_markup_extension_unregister(void* token);
 
 #ifdef __cplusplus
