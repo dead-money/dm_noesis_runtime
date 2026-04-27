@@ -29,12 +29,12 @@
 #![allow(unsafe_op_in_unsafe_fn)] // thin FFI surface — explicit blocks add noise
 
 use core::ptr::NonNull;
-use std::ffi::{c_void, CStr};
+use std::ffi::{CStr, c_void};
 use std::os::raw::c_char;
 
 use crate::ffi::{
-    dm_noesis_font_provider_create, dm_noesis_font_provider_destroy, dm_noesis_set_font_provider,
-    FontProviderVTable, RegisterFontFn,
+    FontProviderVTable, RegisterFontFn, dm_noesis_font_provider_create,
+    dm_noesis_font_provider_destroy, dm_noesis_set_font_provider,
 };
 
 /// Rust-side font provider. `scan_folder` registers every font Noesis

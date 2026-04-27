@@ -21,4 +21,4 @@ pub use device::{
     RenderDevice, RenderTargetBinding, RenderTargetDesc, RenderTargetHandle, TextureBinding,
     TextureDesc, TextureHandle, TextureRect,
 };
-pub use vtable::{register, Registered};
+pub use vtable::{Registered, register};

@@ -112,12 +112,7 @@ unsafe extern "C" {
     pub fn dm_noesis_font_provider_destroy(provider: *mut c_void);
     pub fn dm_noesis_set_font_provider(provider: *mut c_void);
     pub fn dm_noesis_set_font_fallbacks(families: *const *const c_char, count: u32);
-    pub fn dm_noesis_set_font_default_properties(
-        size: f32,
-        weight: i32,
-        stretch: i32,
-        style: i32,
-    );
+    pub fn dm_noesis_set_font_default_properties(size: f32, weight: i32, stretch: i32, style: i32);
 
     pub fn dm_noesis_texture_provider_create(
         vtable: *const TextureProviderVTable,
@@ -147,7 +142,7 @@ unsafe extern "C" {
 
     pub fn dm_noesis_view_mouse_move(view: *mut c_void, x: i32, y: i32) -> bool;
     pub fn dm_noesis_view_mouse_button_down(view: *mut c_void, x: i32, y: i32, button: i32)
-        -> bool;
+    -> bool;
     pub fn dm_noesis_view_mouse_button_up(view: *mut c_void, x: i32, y: i32, button: i32) -> bool;
     pub fn dm_noesis_view_mouse_double_click(
         view: *mut c_void,

@@ -107,9 +107,8 @@ pub fn subscribe_click<H: ClickHandler>(
     // SAFETY: trampoline is `extern "C"`; userdata is freshly leaked; the
     // element pointer is borrowed for the call duration only — Noesis copies
     // whatever it needs into the routed-event handler list.
-    let token = unsafe {
-        dm_noesis_subscribe_click(element.raw(), click_trampoline, userdata.cast())
-    };
+    let token =
+        unsafe { dm_noesis_subscribe_click(element.raw(), click_trampoline, userdata.cast()) };
 
     if let Some(token) = NonNull::new(token) {
         Some(ClickSubscription {

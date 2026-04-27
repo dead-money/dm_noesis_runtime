@@ -16,7 +16,7 @@
 
 use core::marker::PhantomData;
 use core::ptr::NonNull;
-use std::ffi::{c_void, CStr, CString};
+use std::ffi::{CStr, CString, c_void};
 
 use crate::ffi::{
     dm_noesis_base_component_release, dm_noesis_framework_element_find_name,
@@ -25,12 +25,11 @@ use crate::ffi::{
     dm_noesis_renderer_update_render_tree, dm_noesis_view_activate, dm_noesis_view_char,
     dm_noesis_view_create, dm_noesis_view_deactivate, dm_noesis_view_destroy,
     dm_noesis_view_get_content, dm_noesis_view_get_renderer, dm_noesis_view_hscroll,
-    dm_noesis_view_key_down,
-    dm_noesis_view_key_up, dm_noesis_view_mouse_button_down, dm_noesis_view_mouse_button_up,
-    dm_noesis_view_mouse_double_click, dm_noesis_view_mouse_move, dm_noesis_view_mouse_wheel,
-    dm_noesis_view_scroll, dm_noesis_view_set_flags, dm_noesis_view_set_projection_matrix,
-    dm_noesis_view_set_size, dm_noesis_view_touch_down, dm_noesis_view_touch_move,
-    dm_noesis_view_touch_up, dm_noesis_view_update,
+    dm_noesis_view_key_down, dm_noesis_view_key_up, dm_noesis_view_mouse_button_down,
+    dm_noesis_view_mouse_button_up, dm_noesis_view_mouse_double_click, dm_noesis_view_mouse_move,
+    dm_noesis_view_mouse_wheel, dm_noesis_view_scroll, dm_noesis_view_set_flags,
+    dm_noesis_view_set_projection_matrix, dm_noesis_view_set_size, dm_noesis_view_touch_down,
+    dm_noesis_view_touch_move, dm_noesis_view_touch_up, dm_noesis_view_update,
 };
 use crate::render_device::Registered as RegisteredDevice;
 

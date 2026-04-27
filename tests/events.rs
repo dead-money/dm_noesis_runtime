@@ -8,8 +8,8 @@
 //!   `cargo test -p dm_noesis --test events -- --nocapture`
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use dm_noesis::events::subscribe_click;
 use dm_noesis::view::{FrameworkElement, MouseButton, View};

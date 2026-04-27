@@ -92,9 +92,7 @@ impl SamplerState {
     /// Pack the three sampler fields into the canonical byte layout.
     #[must_use]
     pub const fn new(wrap: WrapMode, minmag: MinMagFilter, mip: MipFilter) -> Self {
-        let bits = (wrap as u8 & 0b111)
-            | ((minmag as u8 & 0b1) << 3)
-            | ((mip as u8 & 0b11) << 4);
+        let bits = (wrap as u8 & 0b111) | ((minmag as u8 & 0b1) << 3) | ((mip as u8 & 0b11) << 4);
         Self(bits)
     }
 
@@ -403,12 +401,14 @@ pub const FORMAT_FOR_VERTEX: [u8; VERTEX_SHADER_COUNT] = [
 ];
 
 /// Total vertex stride (bytes) for each `VertexFormat`.
-pub const SIZE_FOR_FORMAT: [u8; VERTEX_FORMAT_COUNT] =
-    [8, 12, 16, 24, 40, 16, 20, 28, 44, 20, 24, 32, 48, 28, 28, 44];
+pub const SIZE_FOR_FORMAT: [u8; VERTEX_FORMAT_COUNT] = [
+    8, 12, 16, 24, 40, 16, 20, 28, 44, 20, 24, 32, 48, 28, 28, 44,
+];
 
 /// Bitmask of `VertexAttr` values present in each `VertexFormat`.
-pub const ATTRIBUTES_FOR_FORMAT: [u8; VERTEX_FORMAT_COUNT] =
-    [1, 3, 5, 37, 101, 19, 21, 53, 117, 11, 13, 45, 109, 15, 43, 167];
+pub const ATTRIBUTES_FOR_FORMAT: [u8; VERTEX_FORMAT_COUNT] = [
+    1, 3, 5, 37, 101, 19, 21, 53, 117, 11, 13, 45, 109, 15, 43, 167,
+];
 
 /// `VertexAttrType` index for each `VertexAttr`.
 pub const TYPE_FOR_ATTR: [u8; VERTEX_ATTR_COUNT] = [1, 3, 1, 1, 0, 4, 2, 2];
