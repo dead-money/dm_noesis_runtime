@@ -376,6 +376,48 @@ bool dm_noesis_view_char(void* view, uint32_t codepoint);
 void dm_noesis_view_activate(void* view);
 void dm_noesis_view_deactivate(void* view);
 
+// ── Element traversal + events (Phase 5.B) ─────────────────────────────────
+//
+// Look up named elements in the logical / visual tree and subscribe Rust
+// callbacks to routed events. Currently exposes `BaseButton::Click` only —
+// extend with sibling functions when other events earn it. The pattern (a
+// heap-allocated handler that owns its registration) generalizes cleanly.
+
+// Look up an element by `x:Name` rooted at `element`. Returns a
+// FrameworkElement* with refcount = +1 for the caller (release via
+// dm_noesis_base_component_release), or NULL if `name` is not found or
+// if the resolved object is not a FrameworkElement (e.g. it's a Brush
+// stored in a ResourceDictionary that happens to share the namescope).
+void* dm_noesis_framework_element_find_name(void* element, const char* name);
+
+// Borrowed view of an element's `x:Name`. NULL when the element has no name.
+// The string is owned by Noesis; caller must not free, must not assume it
+// outlives the next layout pass (in practice Noesis stores names as static
+// strings, but the contract is "don't keep the pointer past your borrow").
+const char* dm_noesis_framework_element_get_name(void* element);
+
+// Click-event callback. Invoked from inside `IView::Update` (or another
+// input-pump method, depending on which event raised the click) on whatever
+// thread is driving the view. Keep work in the callback small — push to a
+// queue and process from a regular system step if you need anything heavy.
+typedef void (*dm_noesis_click_fn)(void* userdata);
+
+// Subscribe `cb(userdata)` to `BaseButton::Click` on `element`. Returns an
+// opaque token (an internal handler) that you must pass to
+// `dm_noesis_unsubscribe_click` exactly once when you're done. Returns NULL
+// if `element` is not castable to `BaseButton` (e.g. it's a ContentControl
+// or a UserControl with no inner button), or if `cb` is NULL.
+//
+// The token holds a +1 ref on the underlying button so the subscription
+// stays valid even if the caller drops every other reference to the
+// element. Release the token before `dm_noesis_shutdown` like every other
+// owning handle in this API.
+void* dm_noesis_subscribe_click(
+    void* element, dm_noesis_click_fn cb, void* userdata);
+
+// Unsubscribe and free the handler. Safe to call with NULL.
+void dm_noesis_unsubscribe_click(void* token);
+
 #ifdef __cplusplus
 }
 #endif

@@ -16,10 +16,11 @@
 
 use core::marker::PhantomData;
 use core::ptr::NonNull;
-use std::ffi::{c_void, CString};
+use std::ffi::{c_void, CStr, CString};
 
 use crate::ffi::{
-    dm_noesis_base_component_release, dm_noesis_gui_load_xaml, dm_noesis_renderer_init,
+    dm_noesis_base_component_release, dm_noesis_framework_element_find_name,
+    dm_noesis_framework_element_get_name, dm_noesis_gui_load_xaml, dm_noesis_renderer_init,
     dm_noesis_renderer_render, dm_noesis_renderer_render_offscreen, dm_noesis_renderer_shutdown,
     dm_noesis_renderer_update_render_tree, dm_noesis_view_activate, dm_noesis_view_char,
     dm_noesis_view_create, dm_noesis_view_deactivate, dm_noesis_view_destroy,
@@ -76,6 +77,50 @@ impl FrameworkElement {
         let ptr = self.ptr.as_ptr();
         core::mem::forget(self);
         ptr
+    }
+
+    /// Raw `Noesis::FrameworkElement*` for handing to other Noesis APIs that
+    /// take one (e.g. event subscription). Borrowed for the lifetime of
+    /// `self`.
+    #[must_use]
+    pub fn raw(&self) -> *mut c_void {
+        self.ptr.as_ptr()
+    }
+
+    /// Look up a descendant by `x:Name`. Returns `None` if no element with
+    /// that name exists in this element's namescope, or if the named object
+    /// is not itself a `FrameworkElement` (e.g. it's a `Brush` registered in
+    /// a `ResourceDictionary`).
+    ///
+    /// The returned element holds an independent `+1` reference — dropping
+    /// it does not affect `self`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `name` contains an interior NUL byte.
+    #[must_use]
+    pub fn find_name(&self, name: &str) -> Option<Self> {
+        let c = CString::new(name).expect("name contained interior NUL");
+        // SAFETY: self.ptr is a live FrameworkElement*; c lives for the call.
+        let ptr = unsafe { dm_noesis_framework_element_find_name(self.ptr.as_ptr(), c.as_ptr()) };
+        NonNull::new(ptr).map(|ptr| Self { ptr })
+    }
+
+    /// The element's `x:Name`, or `None` if it has no name. The returned
+    /// string is a borrowed copy — Noesis owns the underlying storage.
+    #[must_use]
+    pub fn name(&self) -> Option<String> {
+        // SAFETY: self.ptr is a live FrameworkElement*; the C entrypoint
+        // returns either NULL or a Noesis-owned static-ish string we copy
+        // immediately.
+        let p = unsafe { dm_noesis_framework_element_get_name(self.ptr.as_ptr()) };
+        if p.is_null() {
+            None
+        } else {
+            // SAFETY: p is a NUL-terminated UTF-8 / ASCII string while we
+            // hold our element reference; copy out before yielding control.
+            Some(unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned())
+        }
     }
 }
 
