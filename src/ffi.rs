@@ -170,6 +170,7 @@ unsafe extern "C" {
         name: *const c_char,
     ) -> *mut c_void;
     pub fn dm_noesis_framework_element_get_name(element: *mut c_void) -> *const c_char;
+    pub fn dm_noesis_framework_element_set_visibility(element: *mut c_void, visible: bool);
 
     pub fn dm_noesis_subscribe_click(
         element: *mut c_void,

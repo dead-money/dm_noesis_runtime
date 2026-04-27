@@ -402,6 +402,13 @@ void* dm_noesis_framework_element_find_name(void* element, const char* name);
 // strings, but the contract is "don't keep the pointer past your borrow").
 const char* dm_noesis_framework_element_get_name(void* element);
 
+// Set `UIElement::Visibility` on `element` — `true` → Visible, `false` →
+// Collapsed. (Hidden — the third Visibility value, where the element
+// reserves layout space but doesn't paint — isn't exposed; modal/overlay
+// patterns want Collapsed, and a future API can add the third state if
+// needed.) Safe to call with NULL.
+void dm_noesis_framework_element_set_visibility(void* element, bool visible);
+
 // Click-event callback. Invoked from inside `IView::Update` (or another
 // input-pump method, depending on which event raised the click) on whatever
 // thread is driving the view. Keep work in the callback small — push to a

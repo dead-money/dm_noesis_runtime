@@ -26,6 +26,7 @@
 #include <NsGui/BaseButton.h>
 #include <NsGui/FrameworkElement.h>
 #include <NsGui/RoutedEvent.h>
+#include <NsGui/UIElement.h>
 
 namespace {
 
@@ -89,6 +90,12 @@ extern "C" void* dm_noesis_framework_element_find_name(void* element, const char
 extern "C" const char* dm_noesis_framework_element_get_name(void* element) {
     if (!element) return nullptr;
     return static_cast<Noesis::FrameworkElement*>(element)->GetName();
+}
+
+extern "C" void dm_noesis_framework_element_set_visibility(void* element, bool visible) {
+    if (!element) return;
+    auto* fe = static_cast<Noesis::FrameworkElement*>(element);
+    fe->SetVisibility(visible ? Noesis::Visibility_Visible : Noesis::Visibility_Collapsed);
 }
 
 extern "C" void* dm_noesis_subscribe_click(
