@@ -154,6 +154,17 @@ extern "C" void* dm_noesis_view_get_renderer(void* view) {
     return static_cast<Noesis::IView*>(view)->GetRenderer();
 }
 
+extern "C" void* dm_noesis_view_get_content(void* view) {
+    if (!view) return nullptr;
+    Noesis::FrameworkElement* content = static_cast<Noesis::IView*>(view)->GetContent();
+    if (!content) return nullptr;
+    // GetContent returns a non-owning raw pointer (the View owns the +1 ref
+    // it took at CreateView time). Bump the count so callers can release it
+    // through the standard FrameworkElement drop path.
+    content->AddReference();
+    return content;
+}
+
 // ── Renderer ───────────────────────────────────────────────────────────────
 
 extern "C" void dm_noesis_renderer_init(void* renderer, void* render_device) {

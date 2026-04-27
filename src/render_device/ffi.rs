@@ -120,11 +120,9 @@ pub struct RenderDeviceVTable {
         count: u32,
     ),
 
-    pub map_vertices:
-        unsafe extern "C" fn(userdata: *mut c_void, bytes: u32) -> *mut c_void,
+    pub map_vertices: unsafe extern "C" fn(userdata: *mut c_void, bytes: u32) -> *mut c_void,
     pub unmap_vertices: unsafe extern "C" fn(userdata: *mut c_void),
-    pub map_indices:
-        unsafe extern "C" fn(userdata: *mut c_void, bytes: u32) -> *mut c_void,
+    pub map_indices: unsafe extern "C" fn(userdata: *mut c_void, bytes: u32) -> *mut c_void,
     pub unmap_indices: unsafe extern "C" fn(userdata: *mut c_void),
 
     pub draw_batch: unsafe extern "C" fn(

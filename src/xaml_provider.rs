@@ -16,12 +16,12 @@
 #![allow(unsafe_op_in_unsafe_fn)] // thin FFI surface — explicit blocks add noise
 
 use core::ptr::NonNull;
-use std::ffi::{c_void, CStr};
+use std::ffi::{CStr, c_void};
 use std::os::raw::c_char;
 
 use crate::ffi::{
-    dm_noesis_set_xaml_provider, dm_noesis_xaml_provider_create,
-    dm_noesis_xaml_provider_destroy, XamlProviderVTable,
+    XamlProviderVTable, dm_noesis_set_xaml_provider, dm_noesis_xaml_provider_create,
+    dm_noesis_xaml_provider_destroy,
 };
 
 /// Rust-side XAML provider. The bytes returned from [`load_xaml`] are wrapped

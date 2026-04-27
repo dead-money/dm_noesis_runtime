@@ -20,8 +20,8 @@ use std::sync::{Arc, Mutex};
 use dm_noesis::render_device::ffi::dm_noesis_test_run_frame_scenario;
 use dm_noesis::render_device::types::{Batch, DeviceCaps, Shader, TextureFormat, Tile};
 use dm_noesis::render_device::{
-    register, RenderDevice, RenderTargetBinding, RenderTargetDesc, RenderTargetHandle,
-    TextureBinding, TextureDesc, TextureHandle, TextureRect,
+    RenderDevice, RenderTargetBinding, RenderTargetDesc, RenderTargetHandle, TextureBinding,
+    TextureDesc, TextureHandle, TextureRect, register,
 };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -197,11 +197,7 @@ impl RenderDevice for MockDevice {
         }
     }
 
-    fn clone_render_target(
-        &mut self,
-        label: &str,
-        src: RenderTargetHandle,
-    ) -> RenderTargetBinding {
+    fn clone_render_target(&mut self, label: &str, src: RenderTargetHandle) -> RenderTargetBinding {
         self.push(Op::CloneRenderTarget {
             label: label.to_owned(),
             src: src.0.get(),

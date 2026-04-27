@@ -32,12 +32,12 @@
 #![allow(unsafe_op_in_unsafe_fn)] // thin FFI surface — explicit blocks add noise
 
 use core::ptr::NonNull;
-use std::ffi::{c_void, CStr};
+use std::ffi::{CStr, c_void};
 use std::os::raw::c_char;
 
 use crate::ffi::{
-    dm_noesis_set_texture_provider, dm_noesis_texture_provider_create,
-    dm_noesis_texture_provider_destroy, TextureInfoFfi, TextureProviderVTable,
+    TextureInfoFfi, TextureProviderVTable, dm_noesis_set_texture_provider,
+    dm_noesis_texture_provider_create, dm_noesis_texture_provider_destroy,
 };
 
 /// Metadata a [`TextureProvider`] can report for a URI without decoding
@@ -229,8 +229,7 @@ pub fn set_texture_provider<P: TextureProvider>(provider: P) -> Registered {
     let outer: Box<Box<dyn TextureProvider>> = Box::new(Box::new(provider));
     let userdata = Box::into_raw(outer);
     // SAFETY: VTABLE is 'static; userdata is freshly leaked.
-    let handle =
-        unsafe { dm_noesis_texture_provider_create(&raw const VTABLE, userdata.cast()) };
+    let handle = unsafe { dm_noesis_texture_provider_create(&raw const VTABLE, userdata.cast()) };
     let handle = NonNull::new(handle).expect("dm_noesis_texture_provider_create returned null");
     unsafe { dm_noesis_set_texture_provider(handle.as_ptr()) };
 

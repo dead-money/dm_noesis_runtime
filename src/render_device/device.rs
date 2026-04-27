@@ -180,13 +180,7 @@ pub trait RenderDevice: Send + Sync + 'static {
     /// Replace a region of a dynamic texture mip level. `data` is tightly
     /// packed (no extra pitch); its length matches `rect.width * rect.height *
     /// bytes_per_pixel(format)`.
-    fn update_texture(
-        &mut self,
-        handle: TextureHandle,
-        level: u32,
-        rect: TextureRect,
-        data: &[u8],
-    );
+    fn update_texture(&mut self, handle: TextureHandle, level: u32, rect: TextureRect, data: &[u8]);
 
     /// Called after a batch of [`update_texture`](Self::update_texture) calls,
     /// before any rendering uses the affected textures. The impl can issue
@@ -203,8 +197,7 @@ pub trait RenderDevice: Send + Sync + 'static {
 
     /// Create a render target that reuses transient buffers (stencil, MSAA
     /// color) of `src`. Useful for ping-pong post-processing chains.
-    fn clone_render_target(&mut self, label: &str, src: RenderTargetHandle)
-        -> RenderTargetBinding;
+    fn clone_render_target(&mut self, label: &str, src: RenderTargetHandle) -> RenderTargetBinding;
 
     /// Release the resource the C++ `RustRenderTarget` wrapper held.
     fn drop_render_target(&mut self, handle: RenderTargetHandle);

@@ -112,12 +112,7 @@ unsafe extern "C" {
     pub fn dm_noesis_font_provider_destroy(provider: *mut c_void);
     pub fn dm_noesis_set_font_provider(provider: *mut c_void);
     pub fn dm_noesis_set_font_fallbacks(families: *const *const c_char, count: u32);
-    pub fn dm_noesis_set_font_default_properties(
-        size: f32,
-        weight: i32,
-        stretch: i32,
-        style: i32,
-    );
+    pub fn dm_noesis_set_font_default_properties(size: f32, weight: i32, stretch: i32, style: i32);
 
     pub fn dm_noesis_texture_provider_create(
         vtable: *const TextureProviderVTable,
@@ -137,6 +132,7 @@ unsafe extern "C" {
     pub fn dm_noesis_view_update(view: *mut c_void, time_seconds: f64) -> bool;
     pub fn dm_noesis_view_set_flags(view: *mut c_void, flags: u32);
     pub fn dm_noesis_view_get_renderer(view: *mut c_void) -> *mut c_void;
+    pub fn dm_noesis_view_get_content(view: *mut c_void) -> *mut c_void;
 
     pub fn dm_noesis_renderer_init(renderer: *mut c_void, render_device: *mut c_void);
     pub fn dm_noesis_renderer_shutdown(renderer: *mut c_void);
@@ -146,7 +142,7 @@ unsafe extern "C" {
 
     pub fn dm_noesis_view_mouse_move(view: *mut c_void, x: i32, y: i32) -> bool;
     pub fn dm_noesis_view_mouse_button_down(view: *mut c_void, x: i32, y: i32, button: i32)
-        -> bool;
+    -> bool;
     pub fn dm_noesis_view_mouse_button_up(view: *mut c_void, x: i32, y: i32, button: i32) -> bool;
     pub fn dm_noesis_view_mouse_double_click(
         view: *mut c_void,
@@ -168,4 +164,22 @@ unsafe extern "C" {
 
     pub fn dm_noesis_view_activate(view: *mut c_void);
     pub fn dm_noesis_view_deactivate(view: *mut c_void);
+
+    pub fn dm_noesis_framework_element_find_name(
+        element: *mut c_void,
+        name: *const c_char,
+    ) -> *mut c_void;
+    pub fn dm_noesis_framework_element_get_name(element: *mut c_void) -> *const c_char;
+
+    pub fn dm_noesis_subscribe_click(
+        element: *mut c_void,
+        cb: ClickFn,
+        userdata: *mut c_void,
+    ) -> *mut c_void;
+    pub fn dm_noesis_unsubscribe_click(token: *mut c_void);
 }
+
+/// C callback invoked when a subscribed `BaseButton::Click` fires. See
+/// `cpp/noesis_shim.h` for the threading contract — the callback runs on
+/// whatever thread is driving the view, so keep work small.
+pub type ClickFn = unsafe extern "C" fn(userdata: *mut c_void);

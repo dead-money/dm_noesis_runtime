@@ -18,8 +18,8 @@ use crate::render_device::device::{
     RenderDevice, RenderTargetDesc, RenderTargetHandle, TextureDesc, TextureHandle, TextureRect,
 };
 use crate::render_device::ffi::{
-    dm_noesis_render_device_create, dm_noesis_render_device_destroy, RenderDeviceVTable,
-    RenderTargetBindingFfi, TextureBindingFfi,
+    RenderDeviceVTable, RenderTargetBindingFfi, TextureBindingFfi, dm_noesis_render_device_create,
+    dm_noesis_render_device_destroy,
 };
 use crate::render_device::types::{Batch, DeviceCaps, TextureFormat, Tile};
 

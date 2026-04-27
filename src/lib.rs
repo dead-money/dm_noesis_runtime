@@ -12,6 +12,7 @@
 
 use std::ffi::{CStr, CString};
 
+pub mod events;
 pub mod ffi;
 pub mod font_provider;
 pub mod gui;
