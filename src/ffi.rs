@@ -113,6 +113,11 @@ unsafe extern "C" {
     pub fn dm_noesis_set_font_provider(provider: *mut c_void);
     pub fn dm_noesis_set_font_fallbacks(families: *const *const c_char, count: u32);
     pub fn dm_noesis_set_font_default_properties(size: f32, weight: i32, stretch: i32, style: i32);
+    pub fn dm_noesis_font_provider_register_font(
+        provider: *mut c_void,
+        folder_uri: *const c_char,
+        filename: *const c_char,
+    );
 
     pub fn dm_noesis_texture_provider_create(
         vtable: *const TextureProviderVTable,

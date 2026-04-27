@@ -123,6 +123,15 @@ extern "C" void dm_noesis_set_font_provider(void* provider) {
     Noesis::GUI::SetFontProvider(static_cast<Noesis::FontProvider*>(provider));
 }
 
+extern "C" void dm_noesis_font_provider_register_font(
+    void* provider, const char* folder_uri, const char* filename)
+{
+    if (!provider || !filename) return;
+    auto* p = static_cast<RustFontProvider*>(provider);
+    Noesis::Uri folder{folder_uri ? folder_uri : ""};
+    p->RegisterFontFromRust(folder, filename);
+}
+
 extern "C" void dm_noesis_set_font_fallbacks(const char* const* families, uint32_t count) {
     if (!families || count == 0) {
         Noesis::GUI::SetFontFallbacks(nullptr, 0);

@@ -243,6 +243,25 @@ void dm_noesis_set_font_provider(void* provider);
 // present in the element's explicit FontFamily.
 void dm_noesis_set_font_fallbacks(const char* const* families, uint32_t count);
 
+// Register a font face directly with the provider's underlying
+// `CachedFontProvider` cache, bypassing Noesis's lazy `ScanFolder` model.
+// `provider` must be a pointer returned from
+// `dm_noesis_font_provider_create` (a `RustFontProvider`); the folder/
+// filename pair must resolve through the same `open_font` callback that
+// would normally service `ScanFolder` registrations. Calling this for a
+// `(folder, filename)` already registered is safe — Noesis re-opens the
+// stream and re-scans face metadata; the duplicate face entry is ignored
+// during `MatchFont`.
+//
+// Use case: when font assets land asynchronously (e.g. a Bevy
+// `AssetServer`), the synchronous `ScanFolder` flow can run before all
+// faces are present. Eagerly calling this once per loaded font ensures
+// every face is in the cache before XAML's first `FontFamily` lookup,
+// without depending on which font happened to be referenced from a
+// fallback chain at scan time.
+void dm_noesis_font_provider_register_font(
+    void* provider, const char* folder_uri, const char* filename);
+
 // Default font size/weight/stretch/style applied when elements don't
 // specify them. `weight`, `stretch`, `style` mirror `NsGui/InputEnums.h`
 // enums; see their declarations for values.
