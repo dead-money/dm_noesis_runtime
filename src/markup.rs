@@ -81,12 +81,13 @@ pub struct ClosureHandler<F: FnMut(&str) -> Option<String> + Send + 'static> {
     scratch: String,
 }
 
-/// RAII handle for a registered MarkupExtension. Drop after the last XAML
-/// using the extension has been parsed and any outstanding instances
-/// released — typically at process shutdown.
+/// RAII handle for a registered MarkupExtension. Drop unregisters from
+/// the Factory + Reflection registries — preventing new instances from
+/// being parsed — but the underlying MarkupClassData and the boxed
+/// handler survive as long as live extension instances remain. Same
+/// intrusive-refcount contract as [`crate::classes::ClassRegistration`].
 pub struct MarkupExtensionRegistration {
     token: NonNull<c_void>,
-    handler: NonNull<Box<dyn MarkupExtensionHandler>>,
     _name: CString,
 }
 
@@ -112,16 +113,21 @@ impl MarkupExtensionRegistration {
         let userdata = Box::into_raw(boxed);
 
         let token = unsafe {
-            dm_noesis_markup_extension_register(cname.as_ptr(), provide_trampoline, userdata.cast())
+            dm_noesis_markup_extension_register(
+                cname.as_ptr(),
+                provide_trampoline,
+                userdata.cast(),
+                markup_handler_free_trampoline,
+            )
         };
         let Some(token) = NonNull::new(token) else {
+            // Registration rejected before C++ took ownership of the box.
             unsafe { drop(Box::from_raw(userdata)) };
             return None;
         };
 
         Some(Self {
             token,
-            handler: NonNull::new(userdata).expect("Box::into_raw returned null"),
             _name: cname,
         })
     }
@@ -148,15 +154,31 @@ impl MarkupExtensionRegistration {
 
 impl Drop for MarkupExtensionRegistration {
     fn drop(&mut self) {
-        // SAFETY: token + handler produced together by `new`; freed exactly
-        // once here. Caller is responsible for ensuring no live extension
-        // instances reference the registration — we cannot enforce it.
-        unsafe {
-            dm_noesis_markup_extension_unregister(self.token.as_ptr());
-            forget_string_scratch(self.handler.as_ptr().cast());
-            drop(Box::from_raw(self.handler.as_ptr()));
-        }
+        // The C++ side owns the boxed handler. `dm_noesis_markup_extension_unregister`
+        // releases the Rust caller's MarkupClassData ref — if no extension
+        // instances are alive, ClassData self-destructs immediately and
+        // `markup_handler_free_trampoline` runs to drop the handler box;
+        // otherwise the deferred free runs when the last instance dies.
+        //
+        // SAFETY: `self.token` was produced by `new` and is freed exactly
+        // once here.
+        unsafe { dm_noesis_markup_extension_unregister(self.token.as_ptr()) };
     }
+}
+
+/// Free trampoline matching [`crate::ffi::MarkupFreeFn`]. Drops the
+/// `Box<Box<dyn MarkupExtensionHandler>>` whose ownership was transferred
+/// to C++ at register time, plus the per-handler scratch slot.
+unsafe extern "C" fn markup_handler_free_trampoline(userdata: *mut c_void) {
+    if userdata.is_null() {
+        return;
+    }
+    forget_string_scratch(userdata);
+    // SAFETY: `userdata` is the `Box::into_raw` from `new`. Single-owner
+    // contract; C++ calls this exactly once.
+    drop(Box::from_raw(
+        userdata as *mut Box<dyn MarkupExtensionHandler>,
+    ));
 }
 
 // ── Trampoline ─────────────────────────────────────────────────────────────

@@ -49,6 +49,28 @@ use crate::ffi::{
     dm_noesis_instance_set_property,
 };
 
+/// Free trampoline matching [`crate::ffi::ClassFreeFn`]. The C++ side holds a
+/// pointer to this function and invokes it exactly once when the underlying
+/// `ClassData` is finally freed (immediately at unregister if no instances
+/// exist, or deferred to the last live instance's destruction). Drops the
+/// double-boxed `Box<dyn PropertyChangeHandler>` whose ownership was
+/// transferred to C++ at registration time, and clears the prop-types
+/// scratch slot keyed on the same userdata pointer.
+unsafe extern "C" fn class_handler_free_trampoline(userdata: *mut c_void) {
+    if userdata.is_null() {
+        return;
+    }
+    forget_prop_types(userdata);
+    // SAFETY: `userdata` is `Box::into_raw(Box<Box<dyn PropertyChangeHandler>>)`
+    // produced by `ClassBuilder::register`. The C++ ClassData holds the
+    // unique ownership; this is the matching `Box::from_raw` that ends it.
+    unsafe {
+        drop(Box::from_raw(
+            userdata as *mut Box<dyn PropertyChangeHandler>,
+        ))
+    };
+}
+
 /// Read width / height of an `ImageSource` value (or any `BaseComponent*`
 /// whose runtime type is an `ImageSource` subclass). Returns `None` when
 /// the pointer is null or doesn't downcast.
@@ -202,9 +224,13 @@ impl<H: PropertyChangeHandler> ClassBuilder<H> {
                 base,
                 prop_changed_trampoline,
                 userdata.cast(),
+                class_handler_free_trampoline,
             )
         };
         let Some(token) = NonNull::new(token) else {
+            // Registration failed before C++ took ownership of the userdata
+            // box (the C side returns NULL before storing the pointer on
+            // ClassData). Drop locally.
             forget_prop_types(userdata.cast());
             unsafe { drop(Box::from_raw(userdata)) };
             return None;
@@ -221,18 +247,17 @@ impl<H: PropertyChangeHandler> ClassBuilder<H> {
                 )
             };
             if idx == u32::MAX {
-                unsafe {
-                    dm_noesis_class_unregister(token.as_ptr());
-                    forget_prop_types(userdata.cast());
-                    drop(Box::from_raw(userdata));
-                }
+                // C++ owns the userdata box now (registered above); calling
+                // `dm_noesis_class_unregister` triggers the free trampoline
+                // when ClassData's last ref drops, which is right here since
+                // no instances were created yet.
+                unsafe { dm_noesis_class_unregister(token.as_ptr()) };
                 return None;
             }
         }
 
         Some(ClassRegistration {
             token,
-            handler: NonNull::new(userdata).expect("Box::into_raw returned null"),
             _name: name,
             num_props: props.len() as u32,
         })
@@ -334,13 +359,13 @@ impl OwnedDefault {
     }
 }
 
-/// RAII handle for a registered class. Drop **after** all live instances
-/// are released — typically at process shutdown. The C++ side asserts
-/// nothing on this front (Noesis just deletes the TypeClass), so respecting
-/// the contract is on the caller.
+/// RAII handle for a registered class. Drop unregisters the class —
+/// preventing new instances from being created — but the underlying
+/// ClassData (and the boxed handler) survive as long as instances remain
+/// alive. The intrusive refcount on the C++ side guarantees the handler
+/// outlives any property-change callback fired during instance destruction.
 pub struct ClassRegistration {
     token: NonNull<c_void>,
-    handler: NonNull<Box<dyn PropertyChangeHandler>>,
     _name: CString,
     num_props: u32,
 }
@@ -366,14 +391,18 @@ impl ClassRegistration {
 
 impl Drop for ClassRegistration {
     fn drop(&mut self) {
-        // SAFETY: token + handler produced together by ClassBuilder::register;
-        // freed exactly once here. Caller is responsible for ensuring no live
-        // instances reference the class — we cannot enforce it from Rust.
-        unsafe {
-            dm_noesis_class_unregister(self.token.as_ptr());
-            forget_prop_types(self.handler.as_ptr().cast());
-            drop(Box::from_raw(self.handler.as_ptr()));
-        }
+        // The C++ side owns the boxed handler (transferred at register
+        // time) and is responsible for calling `class_handler_free_trampoline`
+        // exactly once when the underlying ClassData is finally freed.
+        // That happens *here* if no instances are alive, or deferred to
+        // the last instance's destruction otherwise — which is the whole
+        // point of the refcount: instances may legally outlive the Rust
+        // `ClassRegistration` (e.g. when Bevy drops the registry resource
+        // before the View tearing down).
+        //
+        // SAFETY: `self.token` was produced by `ClassBuilder::register`
+        // and is freed exactly once here.
+        unsafe { dm_noesis_class_unregister(self.token.as_ptr()) };
     }
 }
 

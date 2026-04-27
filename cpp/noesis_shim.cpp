@@ -40,9 +40,22 @@ extern "C" void dm_noesis_init(void)
     Noesis::Init();
 }
 
+// Forward declarations for the per-subsystem shutdown sweeps. Defined in
+// noesis_classes.cpp / noesis_markup.cpp respectively.
+extern "C" void dm_noesis_classes_force_free_at_shutdown(void);
+extern "C" void dm_noesis_markup_extensions_force_free_at_shutdown(void);
+
 extern "C" void dm_noesis_shutdown(void)
 {
+    // Order matters: Noesis::Shutdown must run first to destroy every
+    // live DependencyObject (which fires their refcount-driven Release
+    // calls into our trampolines, naturally freeing most handler boxes).
+    // The sweeps then defensively free any handler boxes whose owning
+    // instances bypassed normal teardown — a belt-and-suspenders for
+    // orphaned-View paths that never `drop`-ed before shutdown.
     Noesis::Shutdown();
+    dm_noesis_classes_force_free_at_shutdown();
+    dm_noesis_markup_extensions_force_free_at_shutdown();
 }
 
 extern "C" const char* dm_noesis_version(void)

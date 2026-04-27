@@ -184,6 +184,7 @@ unsafe extern "C" {
         base: ClassBase,
         cb: PropChangedFn,
         userdata: *mut c_void,
+        free_handler: ClassFreeFn,
     ) -> *mut c_void;
     pub fn dm_noesis_class_register_property(
         class_token: *mut c_void,
@@ -212,9 +213,15 @@ unsafe extern "C" {
         name: *const c_char,
         cb: MarkupProvideFn,
         userdata: *mut c_void,
+        free_handler: MarkupFreeFn,
     ) -> *mut c_void;
     pub fn dm_noesis_markup_extension_unregister(token: *mut c_void);
 }
+
+/// Free callback invoked exactly once per registered markup extension
+/// when its underlying C++ MarkupClassData is finally freed. Same shape
+/// and contract as [`ClassFreeFn`] — see that type's docs.
+pub type MarkupFreeFn = unsafe extern "C" fn(userdata: *mut c_void);
 
 /// Callback invoked when a registered MarkupExtension's `ProvideValue` runs
 /// during XAML parse. `key` is the ContentProperty value the parser set on
@@ -275,3 +282,11 @@ pub type PropChangedFn = unsafe extern "C" fn(
     prop_index: u32,
     value_ptr: *const c_void,
 );
+
+/// Free callback invoked exactly once per registered class when the
+/// underlying C++ ClassData is finally freed (either at
+/// `dm_noesis_class_unregister` if no instances exist, or deferred to the
+/// last live instance's destruction). Receives the `userdata` passed at
+/// registration; the Rust trampoline drops the boxed handler. Ownership
+/// of `userdata` transfers to the C++ side at register time.
+pub type ClassFreeFn = unsafe extern "C" fn(userdata: *mut c_void);
