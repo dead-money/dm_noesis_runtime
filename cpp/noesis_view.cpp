@@ -24,6 +24,7 @@
 #include <NsGui/IView.h>
 #include <NsGui/MemoryStream.h>
 #include <NsGui/ResourceDictionary.h>
+#include <NsGui/UICollection.h>
 #include <NsGui/Stream.h>
 #include <NsGui/Uri.h>
 #include <NsGui/XamlProvider.h>
@@ -110,6 +111,42 @@ extern "C" bool dm_noesis_gui_load_application_resources(const char* uri) {
         Noesis::GUI::LoadXaml<Noesis::ResourceDictionary>(Noesis::Uri(uri));
     if (!dict) return false;
     Noesis::GUI::SetApplicationResources(dict);
+    return true;
+}
+
+// Experimental: install application resources by building the merged-
+// dictionary chain manually in C++ so each leaf loads with the parent
+// `ResourceDictionary` already wired into application resources.
+//
+// Why: `LoadXaml<ResourceDictionary>(parent_uri)` parses the parent and
+// recursively parses each `<ResourceDictionary Source="..."/>` in
+// `MergedDictionaries`. The leaves are parsed in isolation — their
+// internal `{StaticResource SiblingKey}` lookups can't see siblings that
+// haven't been parsed yet (or even the ones that already have, if the
+// resolver only walks the leaf's own logical tree). This is the
+// hommlet-side "Brushes.xaml self-merges Colors.xaml" workaround
+// territory.
+//
+// This variant takes the list of leaf URIs explicitly (in dependency
+// order). It constructs an empty parent `ResourceDictionary`, installs
+// it as application resources before loading anything, then for each
+// leaf URI: creates an empty child, adds it to `parent.MergedDictionaries`
+// (parent scope is now visible to the child), and assigns
+// `child.Source = uri` to trigger the load. Each leaf parses with the
+// growing parent context already live.
+extern "C" bool dm_noesis_gui_install_app_resources_chain(
+    const char* const* uris, uint32_t count)
+{
+    if (!uris || count == 0) return false;
+    Noesis::Ptr<Noesis::ResourceDictionary> parent = *new Noesis::ResourceDictionary();
+    Noesis::GUI::SetApplicationResources(parent);
+    for (uint32_t i = 0; i < count; ++i) {
+        const char* leafUri = uris[i];
+        if (!leafUri) continue;
+        Noesis::Ptr<Noesis::ResourceDictionary> child = *new Noesis::ResourceDictionary();
+        parent->GetMergedDictionaries()->Add(child);
+        child->SetSource(Noesis::Uri(leafUri));
+    }
     return true;
 }
 

@@ -128,6 +128,10 @@ unsafe extern "C" {
 
     pub fn dm_noesis_gui_load_xaml(uri: *const c_char) -> *mut c_void;
     pub fn dm_noesis_gui_load_application_resources(uri: *const c_char) -> bool;
+    pub fn dm_noesis_gui_install_app_resources_chain(
+        uris: *const *const c_char,
+        count: u32,
+    ) -> bool;
     pub fn dm_noesis_base_component_release(obj: *mut c_void);
 
     pub fn dm_noesis_view_create(framework_element: *mut c_void) -> *mut c_void;
