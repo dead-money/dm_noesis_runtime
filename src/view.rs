@@ -20,8 +20,9 @@ use std::ffi::{CStr, CString, c_void};
 
 use crate::ffi::{
     dm_noesis_base_component_release, dm_noesis_framework_element_find_name,
-    dm_noesis_framework_element_get_name, dm_noesis_gui_load_xaml, dm_noesis_renderer_init,
-    dm_noesis_renderer_render, dm_noesis_renderer_render_offscreen, dm_noesis_renderer_shutdown,
+    dm_noesis_framework_element_get_name, dm_noesis_framework_element_set_visibility,
+    dm_noesis_gui_load_xaml, dm_noesis_renderer_init, dm_noesis_renderer_render,
+    dm_noesis_renderer_render_offscreen, dm_noesis_renderer_shutdown,
     dm_noesis_renderer_update_render_tree, dm_noesis_view_activate, dm_noesis_view_char,
     dm_noesis_view_create, dm_noesis_view_deactivate, dm_noesis_view_destroy,
     dm_noesis_view_get_content, dm_noesis_view_get_renderer, dm_noesis_view_hscroll,
@@ -121,6 +122,19 @@ impl FrameworkElement {
             // hold our element reference; copy out before yielding control.
             Some(unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned())
         }
+    }
+
+    /// Set `Visibility` to `Visible` (`visible = true`) or `Collapsed`
+    /// (`visible = false`). The third Noesis Visibility state — `Hidden`,
+    /// where the element reserves layout space but doesn't paint —
+    /// isn't surfaced; modal-overlay and panel-toggle patterns
+    /// (the use cases driving this API) want full Collapsed behaviour.
+    /// Add a separate setter if a consumer needs Hidden later.
+    pub fn set_visibility(&mut self, visible: bool) {
+        // SAFETY: self.ptr is a live FrameworkElement*; the C side does a
+        // null check + a typed `SetValue` on the `Visibility` DP. No
+        // userdata or callbacks pass through.
+        unsafe { dm_noesis_framework_element_set_visibility(self.ptr.as_ptr(), visible) }
     }
 }
 
