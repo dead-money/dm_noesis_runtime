@@ -65,7 +65,10 @@ fn set_visibility_toggles_overlay_and_blocks_hit_test() {
 
     {
         let mut bytes = HashMap::new();
-        bytes.insert("scene.xaml".to_string(), VISIBILITY_XAML.as_bytes().to_vec());
+        bytes.insert(
+            "scene.xaml".to_string(),
+            VISIBILITY_XAML.as_bytes().to_vec(),
+        );
         let provider = InMem { bytes };
         let _registered = dm_noesis_runtime::xaml_provider::set_xaml_provider(provider);
 
@@ -76,9 +79,7 @@ fn set_visibility_toggles_overlay_and_blocks_hit_test() {
 
         let content = view.content().expect("View::content returned None");
 
-        let button = content
-            .find_name("HitButton")
-            .expect("find_name HitButton");
+        let button = content.find_name("HitButton").expect("find_name HitButton");
         let counter_in_handler = Arc::clone(&click_count);
         let _click_sub = subscribe_click(&button, move || {
             counter_in_handler.fetch_add(1, Ordering::SeqCst);
