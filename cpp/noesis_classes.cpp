@@ -282,14 +282,29 @@ Noesis::Ptr<Noesis::DependencyProperty> create_dp(
                 name, owner, PropertyMetadata::Create(def), nullptr);
         }
         case DM_NOESIS_PROP_IMAGE_SOURCE: {
-            // Default is null — overriding non-null requires a Ptr we'd hold;
-            // skip for v1 since AoR's slicers default Source to null anyway.
+            // Always seed an explicit null `Ptr<BaseComponent>` default —
+            // without one, `DependencyObject::Init` walks the property
+            // metadata and asks `ValueStorageManagerImpl<Ptr<...>>::Box`
+            // to box a missing source. With certain XAML structures
+            // (e.g. our RustContentControl as a Grid child whose Source
+            // isn't set in attribute syntax) the Box source pointer is
+            // null and Noesis crashes inside the typed `Init` path. The
+            // existing safety_smoke "Block 2" reproduces this once the
+            // synthetic class participates in a real visual-tree walk.
+            //
+            // Overriding non-null defaults from FFI is a v2 feature; AoR's
+            // slicers default Source to null anyway.
+            Ptr<BaseComponent> null_default;
             return DependencyProperty::Create<Ptr<BaseComponent>>(
-                name, TypeOf<ImageSource>(), owner, PropertyMetadata::Create(), nullptr);
+                name, TypeOf<ImageSource>(), owner,
+                PropertyMetadata::Create<Ptr<BaseComponent>>(null_default), nullptr);
         }
         case DM_NOESIS_PROP_BASE_COMPONENT: {
+            // Same Box(null) crash class as IMAGE_SOURCE above.
+            Ptr<BaseComponent> null_default;
             return DependencyProperty::Create<Ptr<BaseComponent>>(
-                name, TypeOf<BaseComponent>(), owner, PropertyMetadata::Create(), nullptr);
+                name, TypeOf<BaseComponent>(), owner,
+                PropertyMetadata::Create<Ptr<BaseComponent>>(null_default), nullptr);
         }
     }
     return nullptr;
