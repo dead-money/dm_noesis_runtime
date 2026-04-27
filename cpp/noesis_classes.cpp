@@ -68,10 +68,12 @@ struct PropEntry {
 //     `class_creator` below) bumps the count via `RustContentControl::
 //     BindClassData`; the instance's destructor releases its share.
 //   * `dm_noesis_class_unregister` calls `Release()` on the Rust caller's
-//     ref. If no instances remain, the count hits 0 and ClassData self-
-//     destructs immediately. If instances are still alive (typical during
-//     app teardown when the View hasn't been torn down yet), the deferred
-//     free runs when the last instance dies.
+//     ref. When the count hits 0, the Rust handler box is freed
+//     immediately via the `free_handler` trampoline; `ClassData` itself,
+//     `typeClass`, and `uiData` persist until process exit. (The
+//     destructor chain from a still-live-during-Release instance walks
+//     `typeClass` after `Release` returns; tearing it down mid-chain
+//     UAFs in libNoesis. See `Release` and `free_class_data_at_shutdown`.)
 //   * On final free we invoke `free_handler(userdata)` — a Rust trampoline
 //     that drops the boxed `dyn PropertyChangeHandler`. The Rust side
 //     never frees its own box; ownership is donated to ClassData at
@@ -117,7 +119,7 @@ struct ClassData {
             //
             // The Noesis-side state (typeClass, uiData, this ClassData
             // itself) is freed at process shutdown by
-            // `free_pending_class_data` after `Noesis::Shutdown` has torn
+            // `dm_noesis_classes_force_free_at_shutdown` after `Noesis::Shutdown` has torn
             // down every live instance. Bounded leak: one ClassData per
             // registered class.
             //
@@ -138,17 +140,24 @@ struct ClassData {
 std::mutex                                       g_registry_mutex;
 std::unordered_map<uint32_t, ClassData*>         g_class_registry;
 
-// Every ClassData ever allocated. Walked by `force_free_class_data_at_shutdown`
-// to defensively free any handler boxes whose owning instances never fired
-// their refcount-driven cleanup (in practice this list is the full set of
-// ClassData allocations — the OS reaps them at process exit). Separate from
-// `g_class_registry` because that map is erased at unregister time.
-std::mutex                                       g_pending_class_mutex;
-std::vector<ClassData*>                          g_pending_class_data;
+// Every successfully-registered ClassData, ever. `Release` doesn't erase
+// from this list when refcount hits zero — instead, the shutdown sweep
+// walks the whole list and free's any handler box that's still set.
+// Entries whose `userdata` is already null (the common case, after
+// instances finished destructing normally) are no-ops in the sweep.
+//
+// We keep the "every allocation" semantic rather than maintaining a true
+// pending list because erasing from a vector during instance destruction
+// would need a dedicated re-entrancy-safe structure; the current cost is
+// O(N_classes) iteration at shutdown over a tiny N. Separate from
+// `g_class_registry` (which is erased at unregister time) because the
+// sweep needs to find entries even after they've been unregistered.
+std::mutex                                       g_all_class_data_mutex;
+std::vector<ClassData*>                          g_all_class_data;
 
-void register_pending_class(ClassData* cd) {
-    std::lock_guard<std::mutex> lock(g_pending_class_mutex);
-    g_pending_class_data.push_back(cd);
+void track_class_data(ClassData* cd) {
+    std::lock_guard<std::mutex> lock(g_all_class_data_mutex);
+    g_all_class_data.push_back(cd);
 }
 
 ClassData* registry_find(Noesis::Symbol sym) {
@@ -445,19 +454,27 @@ extern "C" void* dm_noesis_class_register(
     Noesis::Reflection::RegisterType(cd->typeClass);
     Noesis::Factory::RegisterComponent(sym, Noesis::Symbol(""), class_creator);
 
-    register_pending_class(cd);
-
     if (!registry_insert(sym, cd)) {
         // Symbol collision after the IsTypeRegistered check — extremely
-        // unlikely, but unwind to keep the registry consistent.
+        // unlikely, but unwind to keep the registry consistent. No
+        // instances exist yet (Factory just registered, no XAML has
+        // referenced this class), no destructor chain is in play, and
+        // `cd` hasn't been added to the shutdown sweep list. Free
+        // everything fully — including ClassData itself (and via its
+        // member, the Ptr<UIElementData>).
         Noesis::Factory::UnregisterComponent(sym);
         Noesis::Reflection::Unregister(cd->typeClass);
-        // ClassData has refcount=1 here; bypassing Release() would skip the
-        // free_handler. Use Release() so the trampoline frees the userdata
-        // box on this failure path too.
-        cd->Release();
+        if (cd->free_handler && cd->userdata) {
+            cd->free_handler(cd->userdata);
+        }
+        delete cd;
         return nullptr;
     }
+
+    // Registration succeeded — only NOW add to the shutdown sweep list.
+    // On the failure branch above we fully tore cd down, so it must
+    // never appear in the list.
+    track_class_data(cd);
 
     return cd;
 }
@@ -512,12 +529,16 @@ extern "C" void dm_noesis_class_unregister(void* class_token) {
 // One ClassData per registered class is a bounded leak; gain is that
 // no destructor walks dangling Noesis state.
 extern "C" void dm_noesis_classes_force_free_at_shutdown(void) {
-    std::vector<ClassData*> pending;
+    std::vector<ClassData*> all;
     {
-        std::lock_guard<std::mutex> lock(g_pending_class_mutex);
-        pending = std::move(g_pending_class_data);
+        std::lock_guard<std::mutex> lock(g_all_class_data_mutex);
+        all = std::move(g_all_class_data);
     }
-    for (ClassData* cd : pending) {
+    for (ClassData* cd : all) {
+        // Most entries already have userdata=null (their refcount-driven
+        // free already ran during normal instance teardown); the null
+        // check makes this iteration a no-op for them. Non-null entries
+        // belong to classes whose instances bypassed normal destruction.
         void* ud = cd->userdata;
         cd->userdata = nullptr;
         if (cd->free_handler && ud) {

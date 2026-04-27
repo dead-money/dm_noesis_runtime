@@ -79,15 +79,17 @@ struct MarkupClassData {
 std::mutex                                              g_markup_registry_mutex;
 std::unordered_map<uint32_t, MarkupClassData*>          g_markup_registry;
 
-// Same shape as g_pending_class_data in noesis_classes.cpp — see the
-// comment there. Walked at process shutdown to defensively free any
-// handler boxes that survived normal teardown.
-std::mutex                                              g_pending_markup_mutex;
-std::vector<MarkupClassData*>                           g_pending_markup_data;
+// Same shape as g_all_class_data in noesis_classes.cpp — see the comment
+// there. Holds every successfully-registered MarkupClassData; the
+// shutdown sweep iterates the whole list and frees any handler box
+// whose `userdata` is still set (entries with userdata=null are
+// no-ops, the common case after normal teardown).
+std::mutex                                              g_all_markup_data_mutex;
+std::vector<MarkupClassData*>                           g_all_markup_data;
 
-void register_pending_markup(MarkupClassData* cd) {
-    std::lock_guard<std::mutex> lock(g_pending_markup_mutex);
-    g_pending_markup_data.push_back(cd);
+void track_markup_data(MarkupClassData* cd) {
+    std::lock_guard<std::mutex> lock(g_all_markup_data_mutex);
+    g_all_markup_data.push_back(cd);
 }
 
 MarkupClassData* markup_registry_find(Noesis::Symbol sym) {
@@ -249,15 +251,21 @@ extern "C" void* dm_noesis_markup_extension_register(
     Noesis::Reflection::RegisterType(cd->typeClass);
     Noesis::Factory::RegisterComponent(sym, Noesis::Symbol(""), markup_creator);
 
-    register_pending_markup(cd);
-
     if (!markup_registry_insert(sym, cd)) {
+        // Same fully-torn-down failure path as in noesis_classes.cpp:
+        // no instances exist, no destructor chain in play, `cd` not yet
+        // in the shutdown sweep list — so free everything including
+        // MarkupClassData itself.
         Noesis::Factory::UnregisterComponent(sym);
         Noesis::Reflection::Unregister(cd->typeClass);
-        // Use Release so the free_handler runs even on this failure path.
-        cd->Release();
+        if (cd->free_handler && cd->userdata) {
+            cd->free_handler(cd->userdata);
+        }
+        delete cd;
         return nullptr;
     }
+
+    track_markup_data(cd);
 
     return cd;
 }
@@ -282,12 +290,12 @@ extern "C" void dm_noesis_markup_extension_unregister(void* token) {
 // Process-shutdown sweep — see noesis_classes.cpp's
 // `dm_noesis_classes_force_free_at_shutdown` for the rationale.
 extern "C" void dm_noesis_markup_extensions_force_free_at_shutdown(void) {
-    std::vector<MarkupClassData*> pending;
+    std::vector<MarkupClassData*> all;
     {
-        std::lock_guard<std::mutex> lock(g_pending_markup_mutex);
-        pending = std::move(g_pending_markup_data);
+        std::lock_guard<std::mutex> lock(g_all_markup_data_mutex);
+        all = std::move(g_all_markup_data);
     }
-    for (MarkupClassData* cd : pending) {
+    for (MarkupClassData* cd : all) {
         void* ud = cd->userdata;
         cd->userdata = nullptr;
         if (cd->free_handler && ud) {
