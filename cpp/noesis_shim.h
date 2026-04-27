@@ -553,6 +553,19 @@ bool dm_noesis_instance_get_property(
     uint32_t prop_index,
     void* out_value);
 
+// Read width / height of a Noesis::ImageSource (or a subclass). Returns
+// `false` and leaves the out-params untouched if `image_source` is null or
+// not an ImageSource. Useful for custom controls (NineSlicer / ThreeSlicer)
+// that need to compute viewboxes from the source dimensions.
+//
+// The pointer convention matches what the property-changed callback hands
+// out for `IMAGE_SOURCE` properties: a borrowed `BaseComponent*` whose
+// runtime type is an ImageSource subclass. Caller does not own a ref.
+bool dm_noesis_image_source_get_size(
+    void* image_source,
+    float* out_width,
+    float* out_height);
+
 #ifdef __cplusplus
 }
 #endif

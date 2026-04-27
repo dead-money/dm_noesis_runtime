@@ -201,6 +201,11 @@ unsafe extern "C" {
         prop_index: u32,
         out_value: *mut c_void,
     ) -> bool;
+    pub fn dm_noesis_image_source_get_size(
+        image_source: *mut c_void,
+        out_width: *mut f32,
+        out_height: *mut f32,
+    ) -> bool;
 }
 
 /// C callback invoked when a subscribed `BaseButton::Click` fires. See

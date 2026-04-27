@@ -45,9 +45,30 @@ use std::sync::Mutex;
 
 use crate::ffi::{
     ClassBase, PropType, dm_noesis_class_register, dm_noesis_class_register_property,
-    dm_noesis_class_unregister, dm_noesis_instance_get_property,
-    dm_noesis_instance_set_property,
+    dm_noesis_class_unregister, dm_noesis_image_source_get_size,
+    dm_noesis_instance_get_property, dm_noesis_instance_set_property,
 };
+
+/// Read width / height of an `ImageSource` value (or any `BaseComponent*`
+/// whose runtime type is an `ImageSource` subclass). Returns `None` when
+/// the pointer is null or doesn't downcast.
+///
+/// Useful when a custom-control [`PropertyChangeHandler`] needs the source
+/// dimensions to compute derived properties — NineSlicer / ThreeSlicer's
+/// `OnSlicesChanged` is the motivating example.
+///
+/// # Safety
+///
+/// `image_source` must be a pointer obtained from a [`PropertyValue`]
+/// (`ImageSource` or `BaseComponent` variant) or from another live Noesis
+/// `BaseComponent`. Caller does not own a ref.
+#[must_use]
+pub unsafe fn image_source_size(image_source: NonNull<c_void>) -> Option<(f32, f32)> {
+    let mut w: f32 = 0.0;
+    let mut h: f32 = 0.0;
+    let ok = dm_noesis_image_source_get_size(image_source.as_ptr(), &mut w, &mut h);
+    ok.then_some((w, h))
+}
 
 /// Per-instance Rust callback. Implementations receive a stable instance
 /// pointer (see [`Instance`]) and the index of the changed property — index

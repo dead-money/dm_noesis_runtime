@@ -26,6 +26,7 @@
 
 #include <NsCore/Noesis.h>
 #include <NsCore/Boxing.h>
+#include <NsCore/DynamicCast.h>
 #include <NsCore/Factory.h>
 #include <NsCore/HashMap.h>
 #include <NsCore/Ptr.h>
@@ -460,6 +461,19 @@ extern "C" void dm_noesis_instance_set_property(
             return;
         }
     }
+}
+
+extern "C" bool dm_noesis_image_source_get_size(
+    void* image_source,
+    float* out_width,
+    float* out_height) {
+    if (!image_source || !out_width || !out_height) return false;
+    auto* obj = static_cast<Noesis::BaseComponent*>(image_source);
+    auto* img = Noesis::DynamicCast<Noesis::ImageSource*>(obj);
+    if (!img) return false;
+    *out_width = img->GetWidth();
+    *out_height = img->GetHeight();
+    return true;
 }
 
 extern "C" bool dm_noesis_instance_get_property(
