@@ -17,6 +17,7 @@ pub mod events;
 pub mod ffi;
 pub mod font_provider;
 pub mod gui;
+pub mod markup;
 pub mod render_device;
 pub mod texture_provider;
 pub mod view;

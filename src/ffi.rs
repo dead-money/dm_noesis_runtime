@@ -206,7 +206,25 @@ unsafe extern "C" {
         out_width: *mut f32,
         out_height: *mut f32,
     ) -> bool;
+
+    pub fn dm_noesis_markup_extension_register(
+        name: *const c_char,
+        cb: MarkupProvideFn,
+        userdata: *mut c_void,
+    ) -> *mut c_void;
+    pub fn dm_noesis_markup_extension_unregister(token: *mut c_void);
 }
+
+/// Callback invoked when a registered MarkupExtension's `ProvideValue` runs
+/// during XAML parse. `key` is the ContentProperty value the parser set on
+/// the extension (the bit between `{aor:Localize` and `}`); see
+/// `cpp/noesis_shim.h` for the output-slot contract.
+pub type MarkupProvideFn = unsafe extern "C" fn(
+    userdata: *mut c_void,
+    key: *const c_char,
+    out_string: *mut *const c_char,
+    out_component: *mut *mut c_void,
+) -> bool;
 
 /// C callback invoked when a subscribed `BaseButton::Click` fires. See
 /// `cpp/noesis_shim.h` for the threading contract — the callback runs on

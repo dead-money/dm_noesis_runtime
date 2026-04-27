@@ -566,6 +566,74 @@ bool dm_noesis_image_source_get_size(
     float* out_width,
     float* out_height);
 
+// ── Custom MarkupExtension registration (Phase 5.D) ────────────────────────
+//
+// Register Rust-backed `MarkupExtension` subclasses so XAML's
+// `{myns:Foo positional_arg}` syntax dispatches to a Rust callback.
+// AoR's `LocalizeExtension` is the motivating example —
+// `{aor:Localize menu.main_menu.new_game}` resolves the key through a
+// LocalizationManager and substitutes the result.
+//
+// Architecture mirrors the custom-class FFI: a per-base C++ trampoline
+// (`RustMarkupExtension : Noesis::MarkupExtension`) with a `Key` string
+// field declared as the ContentProperty (so XAML's positional-argument
+// syntax sets it). Each consumer-named extension gets a synthetic
+// `TypeClassBuilder` that AddBases from the trampoline; consumer
+// callbacks are dispatched per-name via a Symbol → ClassData side table.
+//
+// ## v1 scope
+//
+// * Single positional `Key` argument (matches `[ContentProperty("Key")]`).
+// * Callback returns either a borrowed C string (most common) or a
+//   borrowed `BaseComponent*` (for value types that can't be expressed
+//   as text).
+// * No reactive bindings — the callback runs at XAML parse time and the
+//   returned value is substituted statically. Locale switching requires
+//   re-loading the XAML (matches the existing byte-substitution shim's
+//   semantics; full reactivity follows in a separate PR via a
+//   `LocalizationManager`-style indexer + Binding).
+//
+// ## Lifecycle
+//
+// 1. dm_noesis_markup_extension_register("AOR.Localize", cb, userdata)
+//    → opaque token.
+// 2. Load XAML using `{aor:Localize SomeKey}`. Noesis instantiates the
+//    extension, sets `Key = "SomeKey"`, calls ProvideValue, which
+//    fires `cb(userdata, "SomeKey", out_string, out_component)`.
+// 3. Callback writes either out_string OR out_component (not both) and
+//    returns `true`. Returning `false` = no value (Noesis substitutes
+//    UnsetValue).
+// 4. dm_noesis_markup_extension_unregister(token) at shutdown.
+
+// MarkupExtension callback. `key` is the ContentProperty value the XAML
+// parser set on the extension (the bit between `{aor:Localize` and `}`).
+// Output slots: write *exactly one* of them (set the other to NULL):
+//   * `*out_string` — borrowed UTF-8 C string. Must outlive the call;
+//     Noesis copies into its own String storage immediately. Pointing into
+//     userdata-owned long-lived storage is the simplest pattern.
+//   * `*out_component` — borrowed BaseComponent* (e.g. an existing
+//     resource lookup). Caller does NOT consume a ref; Noesis adds its
+//     own AddReference if it stores the value.
+// Return `true` to signal "value produced"; `false` for "no value, use
+// UnsetValue."
+typedef bool (*dm_noesis_markup_provide_fn)(
+    void* userdata,
+    const char* key,
+    const char** out_string,
+    void** out_component);
+
+// Register a Rust-backed MarkupExtension class. NULL on bad input
+// (null name, init not yet called, name already registered).
+void* dm_noesis_markup_extension_register(
+    const char* name,
+    dm_noesis_markup_provide_fn cb,
+    void* userdata);
+
+// Unregister a markup extension class. Safe to call with NULL. Must
+// happen AFTER the last XAML using the extension has been parsed and
+// any outstanding extension instances released — typically at shutdown.
+void dm_noesis_markup_extension_unregister(void* token);
+
 #ifdef __cplusplus
 }
 #endif
