@@ -58,13 +58,25 @@ fn click_event_fires_callback() {
         let element =
             FrameworkElement::load("scene.xaml").expect("load_xaml returned None for scene.xaml");
 
-        // FindName returns None until the view binds the element to a
-        // namescope; do this before view creation to lock down the contract.
-        // (XAML-defined x:Name is registered when the FrameworkElement is
-        // constructed, before the view exists, so this should already work.)
-        let button = element
+        // Both find_name paths should work: pre-view-creation (against the
+        // raw FrameworkElement just loaded) and post-view-creation (via
+        // `View::content()`). The Bevy plugin uses the latter — the
+        // FrameworkElement is consumed by `View::create`, and click
+        // subscriptions need to be wired after the view is up.
+        let pre_view = element
             .find_name("MyButton")
-            .expect("find_name(\"MyButton\") returned None");
+            .expect("pre-view find_name returned None");
+        assert_eq!(pre_view.name().as_deref(), Some("MyButton"));
+        drop(pre_view);
+
+        let mut view = View::create(element);
+        view.set_size(200, 200);
+        view.activate();
+
+        let content = view.content().expect("View::content returned None");
+        let button = content
+            .find_name("MyButton")
+            .expect("post-view find_name returned None");
         assert_eq!(button.name().as_deref(), Some("MyButton"));
 
         let counter_in_handler = Arc::clone(&counter);
@@ -73,18 +85,16 @@ fn click_event_fires_callback() {
         })
         .expect("subscribe_click returned None — element not a button?");
 
-        // Sanity: subscribing a non-button element should return None.
-        let grid = FrameworkElement::load("scene.xaml")
-            .expect("re-load returned None")
-            .find_name("MyButton")
-            .expect("the only named element is MyButton; this find should succeed");
-        // (We re-find the named element above just to keep the test single-button;
-        // checking subscribe-on-grid is deferred — the type-check is in C++.)
-        drop(grid);
-
-        let mut view = View::create(element);
-        view.set_size(200, 200);
-        view.activate();
+        // Sanity: subscribing a non-button (the Grid root) should return None.
+        let grid_handle = view.content().expect("View::content returned None");
+        let grid_subscription = subscribe_click(&grid_handle, || {
+            unreachable!("Grid is not a button; subscribe should not have succeeded");
+        });
+        assert!(
+            grid_subscription.is_none(),
+            "subscribe_click on Grid unexpectedly succeeded"
+        );
+        drop(grid_handle);
 
         // First Update builds the initial render tree. Required before
         // hit-testing works.

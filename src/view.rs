@@ -24,7 +24,8 @@ use crate::ffi::{
     dm_noesis_renderer_render, dm_noesis_renderer_render_offscreen, dm_noesis_renderer_shutdown,
     dm_noesis_renderer_update_render_tree, dm_noesis_view_activate, dm_noesis_view_char,
     dm_noesis_view_create, dm_noesis_view_deactivate, dm_noesis_view_destroy,
-    dm_noesis_view_get_renderer, dm_noesis_view_hscroll, dm_noesis_view_key_down,
+    dm_noesis_view_get_content, dm_noesis_view_get_renderer, dm_noesis_view_hscroll,
+    dm_noesis_view_key_down,
     dm_noesis_view_key_up, dm_noesis_view_mouse_button_down, dm_noesis_view_mouse_button_up,
     dm_noesis_view_mouse_double_click, dm_noesis_view_mouse_move, dm_noesis_view_mouse_wheel,
     dm_noesis_view_scroll, dm_noesis_view_set_flags, dm_noesis_view_set_projection_matrix,
@@ -286,6 +287,22 @@ impl View {
     #[must_use]
     pub fn raw(&self) -> *mut c_void {
         self.ptr.as_ptr()
+    }
+
+    /// The view's content root, as an owning [`FrameworkElement`]. Returns
+    /// `None` only if the view has no content (which shouldn't happen on a
+    /// successfully-constructed `View` — but guard the contract anyway).
+    ///
+    /// The returned element is independently refcounted; dropping it does
+    /// not affect the view's own internal reference. Useful for `find_name`
+    /// lookups against the live tree (e.g. wiring [`crate::events::subscribe_click`]
+    /// to a named button after the view is up).
+    #[must_use]
+    pub fn content(&self) -> Option<FrameworkElement> {
+        // SAFETY: self.ptr is a live IView*; the C entrypoint AddRefs the
+        // returned content pointer so Rust owns the +1.
+        let ptr = unsafe { dm_noesis_view_get_content(self.ptr.as_ptr()) };
+        NonNull::new(ptr).map(|ptr| FrameworkElement { ptr })
     }
 }
 

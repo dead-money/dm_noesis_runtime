@@ -339,6 +339,12 @@ void dm_noesis_view_set_flags(void* view, uint32_t flags);
 // Returns the IRenderer* owned by the View. Do NOT release.
 void* dm_noesis_view_get_renderer(void* view);
 
+// Borrow the View's content as an owning FrameworkElement* (refcount = +1).
+// Returns NULL if the view is null or has no content. Release through
+// dm_noesis_base_component_release like any other FrameworkElement* the API
+// hands out.
+void* dm_noesis_view_get_content(void* view);
+
 // Initialize the renderer with `render_device`. The RenderDevice pointer is
 // the opaque value returned from dm_noesis_render_device_create.
 void dm_noesis_renderer_init(void* renderer, void* render_device);

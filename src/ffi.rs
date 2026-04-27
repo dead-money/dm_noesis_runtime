@@ -137,6 +137,7 @@ unsafe extern "C" {
     pub fn dm_noesis_view_update(view: *mut c_void, time_seconds: f64) -> bool;
     pub fn dm_noesis_view_set_flags(view: *mut c_void, flags: u32);
     pub fn dm_noesis_view_get_renderer(view: *mut c_void) -> *mut c_void;
+    pub fn dm_noesis_view_get_content(view: *mut c_void) -> *mut c_void;
 
     pub fn dm_noesis_renderer_init(renderer: *mut c_void, render_device: *mut c_void);
     pub fn dm_noesis_renderer_shutdown(renderer: *mut c_void);
