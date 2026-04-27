@@ -45,6 +45,21 @@ pub fn load_application_resources(uri: &str) -> bool {
 /// property — at which point the parent already contains every
 /// previously-loaded sibling.
 ///
+/// # Relative URIs in installed leaves
+///
+/// Each leaf is loaded via `ResourceDictionary::SetSource(Uri)`,
+/// which means relative URIs *inside* a leaf — most notably
+/// `<FontFamily>Folder/#Family</FontFamily>` resources — resolve
+/// against the leaf's own location. A `Theme/Fonts.xaml` leaf
+/// declaring `<FontFamily>Fonts/#X</FontFamily>` will look for
+/// family `X` in folder `Theme/Fonts/`, not the project-root
+/// `Fonts/`. If your font provider's `register_font` calls register
+/// under `Fonts/`, the corresponding leaf needs to use a relative-up
+/// URI (`../Fonts/#X`) — or the leaf needs to live at the same
+/// directory level as the assets it references. AoR's original
+/// theme uses absolute `/Assets/Fonts/...` URIs to sidestep this;
+/// in our setup the equivalent is the relative-up form.
+///
 /// # Panics
 ///
 /// Panics if any URI contains an interior NUL byte.

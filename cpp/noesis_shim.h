@@ -335,6 +335,32 @@ void* dm_noesis_gui_load_xaml(const char* uri);
 // Returns `true` if the URI resolved + parsed as a ResourceDictionary.
 bool dm_noesis_gui_load_application_resources(const char* uri);
 
+// Install application resources by building the merged-dictionary chain
+// manually, leaf by leaf. `uris` is `count` leaf `ResourceDictionary`
+// URIs in dependency order — earlier entries must be loadable without
+// referencing later ones. Returns `true` on success; `false` for null /
+// empty input. Replaces any previously-installed application resources.
+//
+// Sidesteps a Noesis behaviour where a top-level `LoadXaml` of a parent
+// dictionary parses its `MergedDictionaries` children in isolation,
+// leaving cross-sibling `{StaticResource SiblingKey}` references inside
+// child bodies null-resolved at parse time. This variant creates each
+// child empty, adds it to the parent's `MergedDictionaries` first, and
+// only then assigns `Source` — so the parent + previously-loaded
+// siblings are visible to the child during parsing.
+//
+// Relative-URI gotcha: each leaf is loaded via `SetSource(Uri)`, so
+// relative URIs *inside* a leaf — most notably
+// `<FontFamily>Folder/#Family</FontFamily>` resources — resolve against
+// the leaf's own location. A `Theme/Fonts.xaml` leaf declaring
+// `<FontFamily>Fonts/#X</FontFamily>` will look for family `X` in
+// folder `Theme/Fonts/`, not the project-root `Fonts/`. If the
+// FontProvider's `RegisterFont` calls register under `Fonts/`, the
+// leaf needs `../Fonts/#X` (or absolute `/Fonts/#X` if your XAML URI
+// resolver supports leading slashes).
+bool dm_noesis_gui_install_app_resources_chain(
+    const char* const* uris, uint32_t count);
+
 // Release a BaseComponent-derived object.
 void dm_noesis_base_component_release(void* obj);
 
