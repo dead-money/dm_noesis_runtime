@@ -17,9 +17,9 @@
 use std::num::NonZeroU64;
 use std::sync::{Arc, Mutex};
 
-use dm_noesis::render_device::ffi::dm_noesis_test_run_frame_scenario;
-use dm_noesis::render_device::types::{Batch, DeviceCaps, Shader, TextureFormat, Tile};
-use dm_noesis::render_device::{
+use dm_noesis_runtime::render_device::ffi::dm_noesis_test_run_frame_scenario;
+use dm_noesis_runtime::render_device::types::{Batch, DeviceCaps, Shader, TextureFormat, Tile};
+use dm_noesis_runtime::render_device::{
     RenderDevice, RenderTargetBinding, RenderTargetDesc, RenderTargetHandle, TextureBinding,
     TextureDesc, TextureHandle, TextureRect, register,
 };
@@ -291,9 +291,9 @@ fn frame_scenario_records_expected_op_sequence() {
         std::env::var("NOESIS_LICENSE_NAME"),
         std::env::var("NOESIS_LICENSE_KEY"),
     ) {
-        dm_noesis::set_license(&name, &key);
+        dm_noesis_runtime::set_license(&name, &key);
     }
-    dm_noesis::init();
+    dm_noesis_runtime::init();
 
     let log: Arc<Mutex<Vec<Op>>> = Arc::new(Mutex::new(Vec::new()));
     let registered = register(MockDevice::new(log.clone()));
@@ -422,5 +422,5 @@ fn frame_scenario_records_expected_op_sequence() {
     }
 
     drop(ops);
-    dm_noesis::shutdown();
+    dm_noesis_runtime::shutdown();
 }

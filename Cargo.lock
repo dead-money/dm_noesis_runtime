@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dm_noesis"
+name = "dm_noesis_runtime"
 version = "0.1.0"
 dependencies = [
  "cc",

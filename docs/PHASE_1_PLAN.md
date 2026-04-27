@@ -6,7 +6,7 @@ Implement enough of the `Noesis::RenderDevice` C++ contract to satisfy every pur
 
 ## Success criteria
 
-- `cargo test -p dm_noesis --test render_device` passes.
+- `cargo test -p dm_noesis_runtime --test render_device` passes.
 - A `MockDevice` records every virtual the C++ subclass dispatches to, and the recorded op sequence matches an asserted ordering.
 - No use of Noesis's `IView` / `IRenderer` in this phase — driving the device into a real Noesis pipeline is Phase 4.
 
@@ -39,7 +39,7 @@ Implement enough of the `Noesis::RenderDevice` C++ contract to satisfy every pur
 
 The base class's non-virtual setters (`SetOffscreenWidth` etc.) and the `DeviceDestroyed` delegate are inherited as-is; we don't override them.
 
-## C++ shim design (`dm_noesis/cpp/`)
+## C++ shim design (`dm_noesis_runtime/cpp/`)
 
 Three new subclasses. Each stores its vtable + a `void* userdata` that points back to the Rust resource:
 
@@ -64,7 +64,7 @@ void  dm_noesis_render_device_destroy(void* device);
 
 The returned `void*` is a raw `Noesis::RenderDevice*`. Phase 4 hands it to `IView::GetRenderer()->Init(device)`.
 
-## Rust API (`dm_noesis/src/render_device/`)
+## Rust API (`dm_noesis_runtime/src/render_device/`)
 
 ```text
 src/render_device/
