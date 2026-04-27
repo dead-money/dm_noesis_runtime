@@ -484,6 +484,29 @@ impl Instance {
         };
         ok.then_some((out[0], out[1], out[2], out[3]))
     }
+
+    /// Read the intrinsic size of an `ImageSource`-typed property's current
+    /// value. Returns `None` when the source is null, not an
+    /// `ImageSource` subclass, or the property index doesn't match an
+    /// `ImageSource` property. Safe wrapper over [`image_source_size`] —
+    /// useful for custom-control handlers (NineSlicer / ThreeSlicer) that
+    /// need source dimensions without dropping into `unsafe`.
+    #[must_use]
+    pub fn get_image_source_size(self, prop_index: u32) -> Option<(f32, f32)> {
+        let mut raw_ptr: *mut c_void = ptr::null_mut();
+        let ok = unsafe {
+            dm_noesis_instance_get_property(
+                self.0.as_ptr(),
+                prop_index,
+                (&raw mut raw_ptr).cast(),
+            )
+        };
+        if !ok {
+            return None;
+        }
+        let ptr = NonNull::new(raw_ptr)?;
+        unsafe { image_source_size(ptr) }
+    }
 }
 
 // SAFETY: Instance is just a raw pointer; the underlying object is owned by
