@@ -8,7 +8,7 @@
 //!
 //! The `Registered` guard must outlive every Noesis-internal reference that
 //! might call back into [`XamlProvider::load_xaml`]. In practice that means
-//! keeping it alive until after `dm_noesis::shutdown()` returns — the latter
+//! keeping it alive until after `dm_noesis_runtime::shutdown()` returns — the latter
 //! releases Noesis's internal `Ptr<XamlProvider>`, after which the C++
 //! wrapper's refcount drops to 1 (ours). Dropping the guard then releases the
 //! final ref, fires the C++ destructor, and frees the boxed Rust impl.

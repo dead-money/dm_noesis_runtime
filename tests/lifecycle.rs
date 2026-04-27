@@ -13,14 +13,14 @@ fn init_version_shutdown() {
         std::env::var("NOESIS_LICENSE_NAME"),
         std::env::var("NOESIS_LICENSE_KEY"),
     ) {
-        dm_noesis::set_license(&name, &key);
+        dm_noesis_runtime::set_license(&name, &key);
     }
 
-    dm_noesis::init();
+    dm_noesis_runtime::init();
 
-    let v = dm_noesis::version();
+    let v = dm_noesis_runtime::version();
     assert!(!v.is_empty(), "version should be non-empty after init");
     eprintln!("Noesis runtime: {v}");
 
-    dm_noesis::shutdown();
+    dm_noesis_runtime::shutdown();
 }

@@ -18,7 +18,7 @@ fn main() {
             "\n\nNOESIS_SDK_DIR is not set.\n\
              Extract the Noesis Native SDK and point NOESIS_SDK_DIR at the directory \
              containing Include/ and Bin/.\n\
-             See dm_noesis/README.md for setup.\n"
+             See dm_noesis_runtime/README.md for setup.\n"
         )
     });
     let sdk = PathBuf::from(&sdk_dir);
@@ -56,7 +56,7 @@ fn main() {
     println!("cargo:lib_dir={}", bin.display());
 
     if target_os == "linux" {
-        // Bake the SDK Bin/ path into rpath so dm_noesis's own integration tests
+        // Bake the SDK Bin/ path into rpath so dm_noesis_runtime's own integration tests
         // find libNoesis.so without LD_LIBRARY_PATH. Downstream consumers do the
         // same in their build.rs via DEP_NOESIS_LIB_DIR.
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}", bin.display());

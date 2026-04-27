@@ -1,4 +1,4 @@
-# dm_noesis
+# dm_noesis_runtime
 
 Rust bindings for the [Noesis GUI Native SDK](https://www.noesisengine.com/) — XAML-driven UI for game engines. Loads `.xaml` scenes, drives the View / IRenderer, exposes a `RenderDevice` trait you implement against your own GPU, and lets you author Rust-backed custom controls + markup extensions that XAML can instantiate by name.
 
@@ -8,7 +8,7 @@ Renderer-agnostic — Bevy 0.18 integration lives in the sibling crate [`dm_noes
 
 ## You need a Noesis license to use this
 
-This crate links against the Noesis Native SDK, which is closed-source commercial software distributed by Noesis Technologies S.L. under their own EULA. dm_noesis itself does not redistribute the SDK — you must obtain it separately and point `NOESIS_SDK_DIR` at your install. In practical terms:
+This crate links against the Noesis Native SDK, which is closed-source commercial software distributed by Noesis Technologies S.L. under their own EULA. dm_noesis_runtime itself does not redistribute the SDK — you must obtain it separately and point `NOESIS_SDK_DIR` at your install. In practical terms:
 
 - **Every developer building this crate needs the [Noesis Native SDK](https://www.noesisengine.com/) (Indie tier or higher).** The build script reads it from `NOESIS_SDK_DIR` at compile time and links `libNoesis.{so,dll,dylib}` from the appropriate `Bin/<platform>/` subdir.
 - **Distribution of binaries built against this crate is governed by your Noesis license.** Indie / Pro / Enterprise have different redistribution terms — see the [Noesis pricing page](https://www.noesisengine.com/pricing.php).
@@ -37,12 +37,12 @@ This crate links against the Noesis Native SDK, which is closed-source commercia
 
 ```toml
 [dependencies]
-dm_noesis = { git = "https://github.com/dead-money/dm_noesis" }
+dm_noesis_runtime = { git = "https://github.com/dead-money/dm_noesis_runtime" }
 ```
 
 ```rust
-use dm_noesis::view::{FrameworkElement, View};
-use dm_noesis::xaml_provider::{set_xaml_provider, XamlProvider};
+use dm_noesis_runtime::view::{FrameworkElement, View};
+use dm_noesis_runtime::xaml_provider::{set_xaml_provider, XamlProvider};
 
 // Implement a XAML provider against your asset pipeline.
 struct MyXaml(std::collections::HashMap<String, Vec<u8>>);
@@ -54,7 +54,7 @@ impl XamlProvider for MyXaml {
 }
 
 // (Once per process.)
-dm_noesis::init();
+dm_noesis_runtime::init();
 
 // Install the provider. The returned guard owns the registration; drop
 // it to clear the global slot.
@@ -74,7 +74,7 @@ loop {
     // see `dm_noesis_bevy` for one complete integration.
 }
 
-dm_noesis::shutdown();
+dm_noesis_runtime::shutdown();
 ```
 
 For the full pipeline (XAML / font / texture providers, RenderDevice, input forwarding) wired against Bevy 0.18, see [`dm_noesis_bevy`](https://github.com/dead-money/dm_noesis_bevy).
@@ -82,10 +82,10 @@ For the full pipeline (XAML / font / texture providers, RenderDevice, input forw
 ### Custom controls
 
 ```rust
-use dm_noesis::classes::{
+use dm_noesis_runtime::classes::{
     ClassBuilder, Instance, PropertyChangeHandler, PropertyValue,
 };
-use dm_noesis::ffi::{ClassBase, PropType};
+use dm_noesis_runtime::ffi::{ClassBase, PropType};
 
 struct NineSlicerHandler { source_idx: u32, /* ... */ }
 impl PropertyChangeHandler for NineSlicerHandler {
@@ -110,7 +110,7 @@ let _registration = b.register().expect("class registration failed");
 ### Custom markup extensions
 
 ```rust
-use dm_noesis::markup::MarkupExtensionRegistration;
+use dm_noesis_runtime::markup::MarkupExtensionRegistration;
 
 let table = std::collections::HashMap::from([
     ("menu.greeting", "Hello, world!"),
