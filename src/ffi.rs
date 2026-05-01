@@ -188,6 +188,18 @@ unsafe extern "C" {
     ) -> *mut c_void;
     pub fn dm_noesis_unsubscribe_click(token: *mut c_void);
 
+    pub fn dm_noesis_subscribe_keydown(
+        element: *mut c_void,
+        cb: KeyDownFn,
+        userdata: *mut c_void,
+    ) -> *mut c_void;
+    pub fn dm_noesis_unsubscribe_keydown(token: *mut c_void);
+
+    pub fn dm_noesis_text_get(element: *mut c_void) -> *const c_char;
+    pub fn dm_noesis_text_set(element: *mut c_void, text: *const c_char) -> bool;
+    pub fn dm_noesis_text_caret_to_end(element: *mut c_void) -> bool;
+    pub fn dm_noesis_focus_element(element: *mut c_void) -> bool;
+
     pub fn dm_noesis_class_register(
         name: *const c_char,
         base: ClassBase,
@@ -247,6 +259,14 @@ pub type MarkupProvideFn = unsafe extern "C" fn(
 /// `cpp/noesis_shim.h` for the threading contract — the callback runs on
 /// whatever thread is driving the view, so keep work small.
 pub type ClickFn = unsafe extern "C" fn(userdata: *mut c_void);
+
+/// C callback invoked when a subscribed `UIElement::KeyDown` fires.
+///
+/// `key` is the raw `Noesis::Key` ordinal (mirror in `view::Key`).
+/// `out_handled` is a borrowed pointer the C++ side pre-clears to `false`;
+/// writing `true` through it sets `KeyEventArgs::handled` so the routed
+/// event stops propagating. Same threading contract as [`ClickFn`].
+pub type KeyDownFn = unsafe extern "C" fn(userdata: *mut c_void, key: i32, out_handled: *mut bool);
 
 // ────────────────────────────────────────────────────────────────────────────
 // Custom XAML class registration (Phase 5.C). See cpp/noesis_shim.h for the
