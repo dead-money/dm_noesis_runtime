@@ -476,6 +476,63 @@ void* dm_noesis_subscribe_click(
 // Unsubscribe and free the handler. Safe to call with NULL.
 void dm_noesis_unsubscribe_click(void* token);
 
+// KeyDown-event callback. Invoked from inside the input pump on whatever
+// thread is driving the view, same threading contract as `dm_noesis_click_fn`.
+//
+// `key` is the raw `Noesis::Key` ordinal — see `view::Key` in src/view.rs for
+// the safe enum mirror. `out_handled` is a borrowed pointer pre-cleared to
+// `false`; the callback may set `*out_handled = true` to stop the routed
+// event propagating (equivalent to setting `KeyEventArgs::handled` in C++).
+typedef void (*dm_noesis_keydown_fn)(void* userdata, int32_t key, bool* out_handled);
+
+// Subscribe `cb(userdata, key, out_handled)` to `UIElement::KeyDown` on
+// `element`. Returns an opaque token (an internal handler) that you must
+// pass to `dm_noesis_unsubscribe_keydown` exactly once when you're done.
+// Returns NULL if `element` is not castable to `UIElement` (essentially
+// every visual element is, but the cast can fail e.g. for a raw `Brush`
+// returned from a ResourceDictionary lookup) or if `cb` is NULL.
+//
+// The token holds a +1 ref on the element so the subscription stays valid
+// even if the caller drops every other reference. Release the token before
+// `dm_noesis_shutdown` like every other owning handle in this API.
+void* dm_noesis_subscribe_keydown(
+    void* element, dm_noesis_keydown_fn cb, void* userdata);
+
+// Unsubscribe and free the keydown handler. Safe to call with NULL.
+void dm_noesis_unsubscribe_keydown(void* token);
+
+// ── Text + focus helpers ───────────────────────────────────────────────────
+//
+// Read / write the `Text` property of a `TextBox` or `TextBlock`, and move
+// keyboard focus to a named element. The console plugin uses these to
+// populate the log surface, mirror the input box, and grab focus on open.
+//
+// Callers should resolve the element via `dm_noesis_framework_element_find_name`
+// first; the helpers `DynamicCast` to the concrete type and no-op safely if
+// the element is not a Text* / not a UIElement.
+
+// Read `Text` from a TextBox or TextBlock. Returns NULL if `element` is null
+// or not a Text* element. The returned string is owned by Noesis (specifically
+// the BaseTextBox::TextContainer / TextBlock::Text storage); do not free, do
+// not assume it outlives the next layout pass — copy if needed.
+const char* dm_noesis_text_get(void* element);
+
+// Write `Text` on a TextBox or TextBlock. `text == NULL` is treated as the
+// empty string. Returns `false` if `element` is null or not a Text* element.
+bool dm_noesis_text_set(void* element, const char* text);
+
+// Move the caret of a TextBox to the end of its current text (i.e. set
+// `CaretIndex = strlen(Text)`). No-op (returns `false`) if `element` is null
+// or not a TextBox. Used by command-history navigation so the cursor sits
+// past the end of the just-restored entry.
+bool dm_noesis_text_caret_to_end(void* element);
+
+// Move keyboard focus to `element`. Equivalent to `UIElement::Focus()` —
+// returns the focusable result Noesis reports (the element accepted focus).
+// `false` for null input or an element that cannot receive focus (e.g. a
+// disabled or non-focusable element).
+bool dm_noesis_focus_element(void* element);
+
 // ── Custom XAML class registration (Phase 5.C) ─────────────────────────────
 //
 // Register Rust-backed types so XAML can instantiate them by name (`<aor:Foo>`)

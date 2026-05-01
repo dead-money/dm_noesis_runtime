@@ -19,18 +19,19 @@ use core::ptr::NonNull;
 use std::ffi::{CStr, CString, c_void};
 
 use crate::ffi::{
-    dm_noesis_base_component_release, dm_noesis_framework_element_find_name,
-    dm_noesis_framework_element_get_name, dm_noesis_framework_element_set_visibility,
-    dm_noesis_gui_load_xaml, dm_noesis_renderer_init, dm_noesis_renderer_render,
-    dm_noesis_renderer_render_offscreen, dm_noesis_renderer_shutdown,
-    dm_noesis_renderer_update_render_tree, dm_noesis_view_activate, dm_noesis_view_char,
-    dm_noesis_view_create, dm_noesis_view_deactivate, dm_noesis_view_destroy,
-    dm_noesis_view_get_content, dm_noesis_view_get_renderer, dm_noesis_view_hscroll,
-    dm_noesis_view_key_down, dm_noesis_view_key_up, dm_noesis_view_mouse_button_down,
-    dm_noesis_view_mouse_button_up, dm_noesis_view_mouse_double_click, dm_noesis_view_mouse_move,
-    dm_noesis_view_mouse_wheel, dm_noesis_view_scroll, dm_noesis_view_set_flags,
-    dm_noesis_view_set_projection_matrix, dm_noesis_view_set_size, dm_noesis_view_touch_down,
-    dm_noesis_view_touch_move, dm_noesis_view_touch_up, dm_noesis_view_update,
+    dm_noesis_base_component_release, dm_noesis_focus_element,
+    dm_noesis_framework_element_find_name, dm_noesis_framework_element_get_name,
+    dm_noesis_framework_element_set_visibility, dm_noesis_gui_load_xaml, dm_noesis_renderer_init,
+    dm_noesis_renderer_render, dm_noesis_renderer_render_offscreen, dm_noesis_renderer_shutdown,
+    dm_noesis_renderer_update_render_tree, dm_noesis_text_caret_to_end, dm_noesis_text_get,
+    dm_noesis_text_set, dm_noesis_view_activate, dm_noesis_view_char, dm_noesis_view_create,
+    dm_noesis_view_deactivate, dm_noesis_view_destroy, dm_noesis_view_get_content,
+    dm_noesis_view_get_renderer, dm_noesis_view_hscroll, dm_noesis_view_key_down,
+    dm_noesis_view_key_up, dm_noesis_view_mouse_button_down, dm_noesis_view_mouse_button_up,
+    dm_noesis_view_mouse_double_click, dm_noesis_view_mouse_move, dm_noesis_view_mouse_wheel,
+    dm_noesis_view_scroll, dm_noesis_view_set_flags, dm_noesis_view_set_projection_matrix,
+    dm_noesis_view_set_size, dm_noesis_view_touch_down, dm_noesis_view_touch_move,
+    dm_noesis_view_touch_up, dm_noesis_view_update,
 };
 use crate::render_device::Registered as RegisteredDevice;
 
@@ -135,6 +136,65 @@ impl FrameworkElement {
         // null check + a typed `SetValue` on the `Visibility` DP. No
         // userdata or callbacks pass through.
         unsafe { dm_noesis_framework_element_set_visibility(self.ptr.as_ptr(), visible) }
+    }
+
+    /// Read the `Text` property of a `TextBox` or `TextBlock`, copying it
+    /// into an owned [`String`]. Returns `None` if this element is neither
+    /// a `TextBox` nor a `TextBlock`, or if the underlying text is null
+    /// (Noesis returns null for an unset / never-touched Text DP).
+    ///
+    /// The pointer Noesis returns is borrowed — we copy immediately so the
+    /// owned String stays valid past the next layout pass (which may
+    /// reallocate the underlying storage).
+    #[must_use]
+    pub fn text(&self) -> Option<String> {
+        // SAFETY: self.ptr is a live FrameworkElement*; the C side
+        // DynamicCasts to TextBox/TextBlock and reads `GetText()`. The
+        // returned pointer is null on type mismatch, otherwise a borrowed
+        // NUL-terminated UTF-8 string from Noesis-owned storage.
+        let p = unsafe { dm_noesis_text_get(self.ptr.as_ptr()) };
+        if p.is_null() {
+            None
+        } else {
+            // SAFETY: p is a live NUL-terminated UTF-8 string while we
+            // hold our element reference; copy out before yielding control.
+            Some(unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned())
+        }
+    }
+
+    /// Write the `Text` property of a `TextBox` or `TextBlock`. Returns
+    /// `true` on success, `false` if this element is neither a TextBox nor
+    /// a TextBlock.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `text` contains an interior NUL byte.
+    pub fn set_text(&mut self, text: &str) -> bool {
+        let c = CString::new(text).expect("text contained interior NUL");
+        // SAFETY: self.ptr is a live FrameworkElement*; c.as_ptr() lives
+        // for the call duration; the C side either copies into Noesis-
+        // owned storage (TextBox::SetText / TextBlock::SetText) or returns
+        // false on a type mismatch.
+        unsafe { dm_noesis_text_set(self.ptr.as_ptr(), c.as_ptr()) }
+    }
+
+    /// Set the caret of a `TextBox` to the end of its current text. No-op
+    /// (returns `false`) if the element is not a `TextBox`. Mirrors AoR's
+    /// `_commandInput.CaretIndex = _commandInput.Text.Length` pattern
+    /// after a history-nav substitution.
+    pub fn set_caret_to_end(&mut self) -> bool {
+        // SAFETY: self.ptr is a live FrameworkElement*; the C side does a
+        // null check + DynamicCast + SetCaretIndex.
+        unsafe { dm_noesis_text_caret_to_end(self.ptr.as_ptr()) }
+    }
+
+    /// Move keyboard focus to this element. Returns the value Noesis
+    /// reports for `UIElement::Focus()` — `true` if the element accepted
+    /// focus, `false` if it's not a UIElement or is non-focusable.
+    pub fn focus(&mut self) -> bool {
+        // SAFETY: self.ptr is a live FrameworkElement*; the C side does a
+        // DynamicCast<UIElement*> + Focus().
+        unsafe { dm_noesis_focus_element(self.ptr.as_ptr()) }
     }
 }
 
