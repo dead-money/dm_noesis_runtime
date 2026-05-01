@@ -87,7 +87,10 @@ fn text_keydown_focus_round_trip() {
             Some("initial log"),
             "TextBlock initial Text mismatch",
         );
-        assert!(log.set_text("rewritten log\nline two"), "set_text(TextBlock) failed");
+        assert!(
+            log.set_text("rewritten log\nline two"),
+            "set_text(TextBlock) failed"
+        );
         assert_eq!(
             log.text().as_deref(),
             Some("rewritten log\nline two"),
@@ -113,7 +116,10 @@ fn text_keydown_focus_round_trip() {
         // ── Caret nudge — only meaningful on TextBox; the TextBlock helper
         //    must short-circuit gracefully.
         assert!(input.set_caret_to_end(), "set_caret_to_end(TextBox) failed");
-        assert!(!log.set_caret_to_end(), "set_caret_to_end(TextBlock) should fail cleanly");
+        assert!(
+            !log.set_caret_to_end(),
+            "set_caret_to_end(TextBlock) should fail cleanly"
+        );
 
         // ── Focus the input box so subsequent KeyDowns route to it. The
         //    `key_down` event below would otherwise route to the focused

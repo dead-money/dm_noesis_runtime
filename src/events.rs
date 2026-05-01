@@ -156,11 +156,7 @@ impl<F: FnMut(Key) -> bool + Send + 'static> KeyDownHandler for F {
 /// and still alive (the [`KeyDownSubscription`] hasn't been dropped).
 /// `out_handled` must be a non-null pointer to a writable bool (the C++
 /// shim guarantees this).
-unsafe extern "C" fn keydown_trampoline(
-    userdata: *mut c_void,
-    key: i32,
-    out_handled: *mut bool,
-) {
+unsafe extern "C" fn keydown_trampoline(userdata: *mut c_void, key: i32, out_handled: *mut bool) {
     let handler = &mut *userdata.cast::<Box<dyn KeyDownHandler>>();
     // Best-effort map of the raw ordinal back to our safe `Key` mirror.
     // Anything outside the mirrored set arrives as `Key::None` — callers
@@ -368,9 +364,8 @@ pub fn subscribe_keydown<H: KeyDownHandler>(
     // SAFETY: trampoline is `extern "C"`; userdata is freshly leaked; the
     // element pointer is borrowed for the call duration only — Noesis copies
     // whatever it needs into the routed-event handler list.
-    let token = unsafe {
-        dm_noesis_subscribe_keydown(element.raw(), keydown_trampoline, userdata.cast())
-    };
+    let token =
+        unsafe { dm_noesis_subscribe_keydown(element.raw(), keydown_trampoline, userdata.cast()) };
 
     if let Some(token) = NonNull::new(token) {
         Some(KeyDownSubscription {
