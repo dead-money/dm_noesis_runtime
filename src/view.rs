@@ -635,8 +635,8 @@ impl FrameworkElement {
     /// element's own coordinate space), by assigning a filled `StreamGeometry` as
     /// its `UIElement::Clip`. An empty slice clears the clip. Returns `false` for a
     /// degenerate polygon (1 or 2 points). The clip counterpart of
-    /// [`set_path_points`](Self::set_path_points), but working on any element — the
-    /// page-turn peel drives a flap's crease with it each frame.
+    /// [`set_path_points`](Self::set_path_points), but working on any element.
+    /// Rewrite the polygon each frame to animate a moving clip region.
     #[must_use = "a false return means the clip was not set (degenerate point count)"]
     pub fn set_clip_points(&mut self, points: &[[f32; 2]]) -> bool {
         if points.len() == 1 {
