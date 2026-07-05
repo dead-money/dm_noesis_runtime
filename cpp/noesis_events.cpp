@@ -499,9 +499,8 @@ extern "C" bool noesis_path_set_points(void* element, const float* xy, uint32_t 
 // Clip any element to a closed polygon built from `count` (x, y) pairs in `xy`
 // (`2*count` floats, in the element's own coordinate space), by assigning a
 // filled `StreamGeometry` as its `UIElement::Clip`. `count == 0` clears the clip
-// (SetClip null). This is the clip affordance behind the page-turn peel: the
-// flipping flap's crease polygon fed from Rust each frame. Returns false on a null
-// element or a degenerate point count (1 or 2 — no polygon).
+// (SetClip null). Returns false on a null element or a degenerate point count
+// (1 or 2 — no polygon).
 extern "C" bool noesis_element_set_clip_points(void* element, const float* xy, uint32_t count) {
     if (!element) return false;
     auto* fe = static_cast<Noesis::FrameworkElement*>(element);
