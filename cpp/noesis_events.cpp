@@ -496,6 +496,34 @@ extern "C" bool noesis_path_set_points(void* element, const float* xy, uint32_t 
     return true;
 }
 
+// Clip any element to a closed polygon built from `count` (x, y) pairs in `xy`
+// (`2*count` floats, in the element's own coordinate space), by assigning a
+// filled `StreamGeometry` as its `UIElement::Clip`. `count == 0` clears the clip
+// (SetClip null). This is the clip affordance behind the page-turn peel: the
+// flipping flap's crease polygon fed from Rust each frame. Returns false on a null
+// element or a degenerate point count (1 or 2 — no polygon).
+extern "C" bool noesis_element_set_clip_points(void* element, const float* xy, uint32_t count) {
+    if (!element) return false;
+    auto* fe = static_cast<Noesis::FrameworkElement*>(element);
+    if (count == 0) {
+        fe->SetClip(nullptr);
+        return true;
+    }
+    if (!xy || count < 3) return false;
+
+    Noesis::Ptr<Noesis::StreamGeometry> geometry = Noesis::MakePtr<Noesis::StreamGeometry>();
+    {
+        Noesis::StreamGeometryContext ctx = geometry->Open();
+        ctx.BeginFigure(Noesis::Point(xy[0], xy[1]), true /* closed, filled region */);
+        for (uint32_t i = 1; i < count; ++i) {
+            ctx.LineTo(Noesis::Point(xy[2 * i], xy[2 * i + 1]));
+        }
+        ctx.Close();
+    }
+    fe->SetClip(geometry);
+    return true;
+}
+
 // ── Generic routed-event subscription ───────────────────────────────────────
 //
 // One mechanism replaces the bespoke Click/KeyDown wrappers for the whole
