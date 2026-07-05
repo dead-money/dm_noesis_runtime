@@ -6,6 +6,16 @@ pre-1.0, any `0.x` release may contain breaking changes.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-07-05
+
+### Added
+
+- `FrameworkElement::set_clip_points(points)` clips any element to a closed
+  polygon (`[x, y]` pairs in the element's own space) by assigning a filled
+  `StreamGeometry` as its `UIElement::Clip`; an empty slice clears the clip and
+  a degenerate 1–2 point polygon is rejected. The clip counterpart of
+  `set_path_points`, working on any element rather than only a `Path`.
+
 ## [0.12.0] - 2026-07-02
 
 ### Added
@@ -143,7 +153,8 @@ Renderer, implementing a `RenderDevice` against your own GPU, and writing
 Rust-backed custom controls and markup extensions. The surface is considered
 near-final ahead of a 1.0 that commits to stability.
 
-[Unreleased]: https://github.com/dead-money/noesis_runtime/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/dead-money/noesis_runtime/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/dead-money/noesis_runtime/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/dead-money/noesis_runtime/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/dead-money/noesis_runtime/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/dead-money/noesis_runtime/compare/v0.9.0...v0.10.0

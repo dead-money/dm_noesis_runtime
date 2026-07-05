@@ -50,7 +50,7 @@ use crate::ffi::{
     noesis_dependency_object_property_tag, noesis_dependency_object_set_attached,
     noesis_dependency_object_set_current_value, noesis_dependency_object_set_property,
     noesis_dependency_object_thread_id, noesis_element_datacontext_get_u64,
-    noesis_element_get_transform3d, noesis_element_set_transform3d,
+    noesis_element_get_transform3d, noesis_element_set_clip_points, noesis_element_set_transform3d,
     noesis_expander_get_is_expanded, noesis_expander_set_is_expanded, noesis_focus_element,
     noesis_framework_element_find_name, noesis_framework_element_find_resource,
     noesis_framework_element_get_data_context, noesis_framework_element_get_halign,
@@ -629,6 +629,26 @@ impl FrameworkElement {
         // DynamicCasts to Path, and copies the points into a Noesis-owned
         // StreamGeometry before returning.
         unsafe { noesis_path_set_points(self.ptr.as_ptr(), points.as_ptr().cast::<f32>(), count) }
+    }
+
+    /// Clip this element to a closed polygon through `points` (`[x, y]` pairs in the
+    /// element's own coordinate space), by assigning a filled `StreamGeometry` as
+    /// its `UIElement::Clip`. An empty slice clears the clip. Returns `false` for a
+    /// degenerate polygon (1 or 2 points). The clip counterpart of
+    /// [`set_path_points`](Self::set_path_points), but working on any element — the
+    /// page-turn peel drives a flap's crease with it each frame.
+    #[must_use = "a false return means the clip was not set (degenerate point count)"]
+    pub fn set_clip_points(&mut self, points: &[[f32; 2]]) -> bool {
+        if points.len() == 1 {
+            return false; // one point is neither a clear nor a polygon
+        }
+        let count = u32::try_from(points.len()).unwrap_or(u32::MAX);
+        // SAFETY: self.ptr is a live FrameworkElement*; `points` lives for the call
+        // and is exactly `2*count` contiguous f32s (empty → null-safe, C clears the
+        // clip); the C side null-checks and copies into a Noesis-owned geometry.
+        unsafe {
+            noesis_element_set_clip_points(self.ptr.as_ptr(), points.as_ptr().cast::<f32>(), count)
+        }
     }
 
     /// Transition this control to the visual state named `state`, via

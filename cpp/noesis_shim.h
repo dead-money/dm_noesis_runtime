@@ -1130,6 +1130,12 @@ bool noesis_focus_element(void* element);
 // Returns `false` for null/short input or an element that is not a `Path`.
 bool noesis_path_set_points(void* element, const float* xy, uint32_t count);
 
+// Clip any element to a closed polygon of `count` (x, y) pairs in `xy` (length
+// `2*count`, in the element's own space) by assigning a filled StreamGeometry as
+// its UIElement::Clip. `count == 0` clears the clip. Returns `false` for a null
+// element or a degenerate point count (1 or 2).
+bool noesis_element_set_clip_points(void* element, const float* xy, uint32_t count);
+
 // Transition a templated control to the visual state named `state` via
 // `VisualStateManager::GoToState`, optionally running the state's
 // VisualTransition (`use_transitions`). `element` is DynamicCast to
